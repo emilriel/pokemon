@@ -34,6 +34,7 @@ export default function PokemonCard({ pokemon, onSelect }) {
 
   return (
     <button
+      id={`pokemon-card-${pokemon.id}`}
       className="pokemon-card"
       type="button"
       onClick={() => onSelect(pokemon)}

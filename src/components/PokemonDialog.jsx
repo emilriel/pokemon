@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { getEvolutionFamily } from '../services/evolution.js'
 import { formatName, typeLabels } from './PokemonCard.jsx'
 
 const statLabels = {
@@ -27,6 +28,7 @@ export default function PokemonDialog({ pokemon, onClose }) {
 
   const image = pokemon.sprites.other['official-artwork'].front_default
     || pokemon.sprites.front_default
+  const family = getEvolutionFamily(pokemon.name)
 
   return (
     <dialog
@@ -93,6 +95,37 @@ export default function PokemonDialog({ pokemon, onClose }) {
             ))}
           </ul>
         </section>
+
+        {family && (
+          <section className="evolution-section" aria-labelledby="evolution-heading">
+            <h3 id="evolution-heading">Linha evolutiva</h3>
+            {family.stages.length > 1 ? (
+              <ol className="evolution-chain">
+                {family.stages.map((members, index) => (
+                  <li className="evolution-stage" key={members[0].id}>
+                    <span className="evolution-stage-label">{index + 1}º estágio</span>
+                    <span className="evolution-members">
+                      {members.map((member) =>
+                        member.id === family.current.id ? (
+                          <strong className="evolution-member is-current" key={member.id}>
+                            {formatName(member.name)}
+                            <span className="sr-only"> (este Pokémon)</span>
+                          </strong>
+                        ) : (
+                          <span className="evolution-member" key={member.id}>
+                            {formatName(member.name)}
+                          </span>
+                        ),
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="evolution-empty">Este Pokémon não evolui.</p>
+            )}
+          </section>
+        )}
       </article>
     </dialog>
   )

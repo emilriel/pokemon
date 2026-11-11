@@ -1,25 +1,66 @@
-import { useEffect, useRef, useState } from 'react'
-import { fetchPokemonCatalog, fetchPokemonDetails } from '../services/pokeApi.js'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { getEvolutionCategory } from '../services/evolution.js'
+import {
+  fetchPokemonCatalog,
+  fetchPokemonDetails,
+  fetchTypeMembers,
+} from '../services/pokeApi.js'
 
 const PAGE_SIZE = 24
+const SEARCH_DELAY = 250
+
+export const MAX_SELECTED_TYPES = 2
 
 function isAbortError(error) {
   return error instanceof DOMException && error.name === 'AbortError'
+}
+
+// "Mr Mime" e "Flabébé" precisam encontrar "mr-mime" e "flabebe".
+function normalizeQuery(text) {
+  return text
+    .trim()
+    .toLocaleLowerCase('pt-BR')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, '-')
+}
+
+function matchesSearch(entry, searchTerm) {
+  if (!searchTerm) return true
+
+  // "25", "#25" e "0025" procuram pelo número da Pokédex.
+  const number = searchTerm.match(/^#?0*(\d+)$/)
+  if (number) return entry.id === Number(number[1])
+
+  return entry.name.includes(searchTerm)
 }
 
 export default function usePokedex() {
   const [catalog, setCatalog] = useState([])
   const [pokemon, setPokemon] = useState([])
   const [query, setQuery] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedTypes, setSelectedTypes] = useState([])
+  const [evolution, setEvolution] = useState('all')
+  const [typeMembers, setTypeMembers] = useState({})
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState('')
   const [retryCount, setRetryCount] = useState(0)
-  const initialPokemon = useRef([])
+  const detailsCache = useRef(new Map())
+  const loadMoreController = useRef(null)
   const nextOffset = useRef(0)
   const requestId = useRef(0)
+
+  // Guarda os detalhes já consultados para não repetir requisições ao trocar filtros.
+  async function loadDetails(entries, signal) {
+    const missing = entries.filter(({ name }) => !detailsCache.current.has(name))
+    const results = await fetchPokemonDetails(missing, signal)
+    missing.forEach(({ name }, index) => detailsCache.current.set(name, results[index]))
+    return entries.map(({ name }) => detailsCache.current.get(name))
+  }
 
   useEffect(() => {
     const controller = new AbortController()
@@ -29,21 +70,12 @@ export default function usePokedex() {
       setError('')
 
       try {
-        const entries = await fetchPokemonCatalog(controller.signal)
-        const firstPage = entries.slice(0, PAGE_SIZE)
-        setCatalog(entries)
-
-        const firstPokemon = await fetchPokemonDetails(firstPage, controller.signal)
-        initialPokemon.current = firstPokemon
-        nextOffset.current = firstPage.length
-        setPokemon(firstPokemon)
-        setHasMore(firstPage.length < entries.length)
+        setCatalog(await fetchPokemonCatalog(controller.signal))
       } catch (loadError) {
         if (!isAbortError(loadError)) {
           setError('Verifique sua conexão e tente novamente em instantes.')
+          setIsLoading(false)
         }
-      } finally {
-        if (!controller.signal.aborted) setIsLoading(false)
       }
     }
 
@@ -51,92 +83,145 @@ export default function usePokedex() {
     return () => controller.abort()
   }, [retryCount])
 
+  // Espera a pessoa parar de digitar antes de pesquisar.
   useEffect(() => {
-    if (!catalog.length) return undefined
+    const nextTerm = normalizeQuery(query)
 
-    const searchTerm = query.trim().toLocaleLowerCase('pt-BR')
+    if (!nextTerm) {
+      setSearchTerm('')
+      return undefined
+    }
 
-    if (!searchTerm) {
-      requestId.current += 1
-      setIsSearching(false)
-      setError('')
-      if (initialPokemon.current.length) {
-        nextOffset.current = initialPokemon.current.length
-        setPokemon(initialPokemon.current)
-        setHasMore(initialPokemon.current.length < catalog.length)
-      }
+    const timeoutId = window.setTimeout(() => setSearchTerm(nextTerm), SEARCH_DELAY)
+    return () => window.clearTimeout(timeoutId)
+  }, [query])
+
+  // Busca a lista de Pokémon de cada tipo selecionado (uma vez por tipo).
+  useEffect(() => {
+    const missingTypes = selectedTypes.filter((type) => !typeMembers[type])
+    if (!missingTypes.length) return undefined
+
+    const controller = new AbortController()
+
+    Promise.all(
+      missingTypes.map(async (type) => [type, await fetchTypeMembers(type, controller.signal)]),
+    )
+      .then((entries) => {
+        setTypeMembers((current) => ({ ...current, ...Object.fromEntries(entries) }))
+      })
+      .catch((typeError) => {
+        if (!isAbortError(typeError)) {
+          setError('Não foi possível carregar esse filtro. Tente novamente.')
+        }
+      })
+
+    return () => controller.abort()
+  }, [selectedTypes, typeMembers, retryCount])
+
+  // Lista de quem passa pela busca e pelos filtros; null enquanto algum dado ainda carrega.
+  const matches = useMemo(() => {
+    if (!catalog.length) return null
+    if (selectedTypes.some((type) => !typeMembers[type])) return null
+
+    return catalog.filter(
+      (entry) =>
+        matchesSearch(entry, searchTerm) &&
+        selectedTypes.every((type) => typeMembers[type].has(entry.name)) &&
+        (evolution === 'all' || getEvolutionCategory(entry.name) === evolution),
+    )
+  }, [catalog, evolution, searchTerm, selectedTypes, typeMembers])
+
+  // Carrega o primeiro lote sempre que a busca ou os filtros mudam.
+  useEffect(() => {
+    loadMoreController.current?.abort()
+
+    if (!matches) {
+      if (catalog.length) setIsSearching(true)
       return undefined
     }
 
     const controller = new AbortController()
     const currentRequestId = ++requestId.current
-    const timeoutId = window.setTimeout(async () => {
+    const firstPage = matches.slice(0, PAGE_SIZE)
+
+    async function loadFirstPage() {
       setIsSearching(true)
       setError('')
 
-      const matches = catalog.filter(({ name }) =>
-        name.toLocaleLowerCase('pt-BR').includes(searchTerm),
-      )
-      const firstPage = matches.slice(0, PAGE_SIZE)
-
       try {
-        const results = await fetchPokemonDetails(firstPage, controller.signal)
+        const results = await loadDetails(firstPage, controller.signal)
         if (requestId.current !== currentRequestId) return
         nextOffset.current = firstPage.length
         setPokemon(results)
         setHasMore(firstPage.length < matches.length)
       } catch (searchError) {
-        if (!isAbortError(searchError) && requestId.current === currentRequestId) {
-          setError('Não foi possível concluir a pesquisa. Tente novamente.')
-        }
-      } finally {
-        if (requestId.current === currentRequestId) setIsSearching(false)
+        if (isAbortError(searchError) || requestId.current !== currentRequestId) return
+        setError('Não foi possível carregar os Pokémon. Tente novamente.')
       }
-    }, 250)
 
-    return () => {
-      window.clearTimeout(timeoutId)
-      controller.abort()
-      if (requestId.current === currentRequestId) requestId.current += 1
+      if (requestId.current === currentRequestId) {
+        setIsLoading(false)
+        setIsSearching(false)
+      }
     }
-  }, [catalog, query])
 
+    loadFirstPage()
+    return () => controller.abort()
+  }, [catalog.length, matches])
+
+  // Devolve o primeiro Pokémon do novo lote, para a tela levar o foco até ele.
   async function loadMore() {
-    if (isLoadingMore || isSearching) return
+    if (isLoadingMore || isSearching || !matches) return null
 
-    const searchTerm = query.trim().toLocaleLowerCase('pt-BR')
-    const matchingEntries = searchTerm
-      ? catalog.filter(({ name }) => name.toLocaleLowerCase('pt-BR').includes(searchTerm))
-      : catalog
-    const nextPage = matchingEntries.slice(nextOffset.current, nextOffset.current + PAGE_SIZE)
+    const nextPage = matches.slice(nextOffset.current, nextOffset.current + PAGE_SIZE)
 
     if (!nextPage.length) {
       setHasMore(false)
-      return
+      return null
     }
 
     const currentRequestId = ++requestId.current
     const controller = new AbortController()
+    loadMoreController.current = controller
     setIsLoadingMore(true)
     setError('')
 
     try {
-      const results = await fetchPokemonDetails(nextPage, controller.signal)
-      if (requestId.current !== currentRequestId) return
+      const results = await loadDetails(nextPage, controller.signal)
+      if (requestId.current !== currentRequestId) return null
       nextOffset.current += nextPage.length
       setPokemon((currentPokemon) => [...currentPokemon, ...results])
-      setHasMore(nextOffset.current < matchingEntries.length)
+      setHasMore(nextOffset.current < matches.length)
+      return results[0]
     } catch (loadError) {
       if (!isAbortError(loadError) && requestId.current === currentRequestId) {
         setError('Não foi possível carregar mais Pokémon. Tente novamente.')
       }
+      return null
     } finally {
-      if (requestId.current === currentRequestId) setIsLoadingMore(false)
+      setIsLoadingMore(false)
     }
   }
 
+  function toggleType(type) {
+    setSelectedTypes((current) => {
+      if (current.includes(type)) return current.filter((item) => item !== type)
+      if (current.length >= MAX_SELECTED_TYPES) return current
+      return [...current, type]
+    })
+  }
+
+  function clearFilters() {
+    setSelectedTypes([])
+    setEvolution('all')
+  }
+
+  function clearAll() {
+    setQuery('')
+    clearFilters()
+  }
+
   function retry() {
-    initialPokemon.current = []
     nextOffset.current = 0
     setCatalog([])
     setPokemon([])
@@ -146,7 +231,10 @@ export default function usePokedex() {
 
   return {
     catalog,
+    clearAll,
+    clearFilters,
     error,
+    evolution,
     hasMore,
     isLoading,
     isLoadingMore,
@@ -155,6 +243,10 @@ export default function usePokedex() {
     pokemon,
     query,
     retry,
+    selectedTypes,
+    setEvolution,
     setQuery,
+    toggleType,
+    totalMatches: matches ? matches.length : null,
   }
 }
