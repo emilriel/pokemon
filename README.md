@@ -87,12 +87,26 @@ npm run preview
 ## Módulo 1
 
 - Lista Pokémon em cartões com ilustrações e tipos.
-- Pesquisa por nome em todo o catálogo.
-- Exibe detalhes, medidas e atributos base em uma janela acessível.
+- Pesquisa por nome ou número em todo o catálogo.
+- Filtra por tipo (até dois ao mesmo tempo) e por estágio de evolução, combinando com a pesquisa.
+- Exibe detalhes, medidas, atributos base e a linha evolutiva em uma janela acessível.
 - Carrega os resultados em lotes com o botão “Carregar mais”.
 - Apresenta estados de carregamento, erro e resultado vazio.
 
 O módulo aplica componentes, props, `useState`, `useEffect`, `fetch` e renderização de listas. A busca filtra os nomes do catálogo carregado e solicita à API os detalhes dos resultados; a paginação carrega detalhes em lotes de 24.
+
+### Filtros
+
+- **Tipo:** cada tipo selecionado faz uma única consulta a `/type/{tipo}`, que devolve todos os Pokémon daquele tipo.
+- **Estágio de evolução:** a PokeAPI não informa o estágio diretamente, apenas de qual espécie cada uma evolui. Para não consultar as 1.025 espécies no navegador, o arquivo `src/data/evolution.json` guarda essa relação e o estágio é calculado a partir dela. O critério segue a API: quem não evolui de ninguém é o 1º estágio (Pichu), quem evolui dele é o 2º (Pikachu) e assim por diante. Quem não tem evolução nenhuma (Tauros) aparece em "Não evolui". Formas alternativas herdam o estágio da espécie.
+
+Para atualizar o arquivo quando a PokeAPI receber novos Pokémon:
+
+```bash
+npm run dados:evolucao
+```
+
+O script lê as tabelas oficiais publicadas no repositório da PokeAPI no GitHub.
 
 ## Tecnologias
 
@@ -128,10 +142,12 @@ A acessibilidade e a usabilidade são requisitos do produto, não uma etapa fina
 ## Estrutura
 
 ```text
+scripts/        # Geração dos dados de evolução
 src/
-	components/   # Cartões, grade e detalhes do Pokémon
+	components/   # Cartões, grade, filtros e detalhes do Pokémon
+	data/         # Linha evolutiva de cada espécie (arquivo gerado)
 	hooks/        # Estado e efeitos do catálogo
-	services/     # Comunicação com a PokeAPI
+	services/     # Comunicação com a PokeAPI e cálculo do estágio de evolução
 	App.jsx       # Composição da tela do catálogo
 	index.css     # Tailwind CSS e estilos responsivos
 	main.jsx      # Montagem da aplicação React

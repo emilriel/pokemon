@@ -12,7 +12,13 @@ async function requestJSON(url, signal) {
 
 export async function fetchPokemonCatalog(signal) {
   const data = await requestJSON(`${API_BASE_URL}/pokemon?limit=2000`, signal)
-  return data.results
+
+  // O número do Pokémon vem no fim do endereço: .../pokemon/25/
+  return data.results.map(({ name, url }) => ({
+    name,
+    url,
+    id: Number(url.match(/\/(\d+)\/?$/)?.[1]),
+  }))
 }
 
 export function fetchPokemonDetails(pokemonEntries, signal) {
@@ -21,4 +27,10 @@ export function fetchPokemonDetails(pokemonEntries, signal) {
       requestJSON(`${API_BASE_URL}/pokemon/${encodeURIComponent(name)}`, signal),
     ),
   )
+}
+
+// Nomes de todos os Pokémon de um tipo, em uma única consulta.
+export async function fetchTypeMembers(type, signal) {
+  const data = await requestJSON(`${API_BASE_URL}/type/${encodeURIComponent(type)}`, signal)
+  return new Set(data.pokemon.map(({ pokemon }) => pokemon.name))
 }

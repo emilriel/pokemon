@@ -1,14 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import PokemonDialog from './components/PokemonDialog.jsx'
+import PokemonFilters from './components/PokemonFilters.jsx'
 import PokemonGrid from './components/PokemonGrid.jsx'
-import usePokedex from './hooks/usePokedex.js'
+import usePokedex, { MAX_SELECTED_TYPES } from './hooks/usePokedex.js'
 
 const numberFormatter = new Intl.NumberFormat('pt-BR')
 
 export default function App() {
   const {
     catalog,
+    clearAll,
+    clearFilters,
     error,
+    evolution,
     hasMore,
     isLoading,
     isLoadingMore,
@@ -17,17 +21,46 @@ export default function App() {
     pokemon,
     query,
     retry,
+    selectedTypes,
+    setEvolution,
     setQuery,
+    toggleType,
+    totalMatches,
   } = usePokedex()
   const [selectedPokemon, setSelectedPokemon] = useState(null)
+  const [pendingFocusId, setPendingFocusId] = useState(null)
+
+  const isFiltering = Boolean(query.trim()) || selectedTypes.length > 0 || evolution !== 'all'
+  const formattedMatches = totalMatches === null ? '' : numberFormatter.format(totalMatches)
+  const resultsLabel = totalMatches === 1 ? 'resultado' : 'resultados'
 
   const statusMessage = error
     ? 'Não foi possível carregar os Pokémon.'
     : isLoading
       ? 'Carregando o catálogo de Pokémon.'
-      : isSearching
+      : isSearching || totalMatches === null
         ? 'Buscando Pokémon.'
-        : `${numberFormatter.format(pokemon.length)} Pokémon exibidos.`
+        : isFiltering
+          ? `${formattedMatches} ${resultsLabel}. ${numberFormatter.format(pokemon.length)} exibidos.`
+          : `${numberFormatter.format(pokemon.length)} Pokémon exibidos.`
+
+  const countMessage = !catalog.length
+    ? 'Conectando ao catálogo'
+    : isFiltering && totalMatches !== null
+      ? `${formattedMatches} ${resultsLabel}`
+      : `${numberFormatter.format(catalog.length)} para descobrir`
+
+  // Depois de "Carregar mais", leva o foco ao primeiro cartão novo para quem navega por teclado.
+  useEffect(() => {
+    if (pendingFocusId === null) return
+    document.getElementById(`pokemon-card-${pendingFocusId}`)?.focus()
+    setPendingFocusId(null)
+  }, [pendingFocusId, pokemon])
+
+  async function handleLoadMore() {
+    const firstNewPokemon = await loadMore()
+    if (firstNewPokemon) setPendingFocusId(firstNewPokemon.id)
+  }
 
   return (
     <div className="app-shell">
@@ -42,7 +75,7 @@ export default function App() {
         </a>
         <span className="topbar-note">
           <span className="connection-dot" aria-hidden="true" />
-          Módulo 01 <span className="topbar-divider">/</span> Catálogo
+          Módulo 01 <span className="topbar-divider" aria-hidden="true">/</span> Catálogo
         </span>
       </header>
 
@@ -59,11 +92,11 @@ export default function App() {
               Explore espécies, descubra seus tipos e encontre seu próximo favorito.
             </p>
           </div>
-          <div className="intro-stamp" aria-label="Catálogo conectado à PokeAPI">
+          <div className="intro-stamp">
             <span className="stamp-number">
               {catalog.length ? numberFormatter.format(catalog.length) : '...'}
             </span>
-            <span className="stamp-label">espécies<br />no catálogo</span>
+            <span className="stamp-label">Pokémon<br />no catálogo</span>
             <span className="stamp-source">DADOS POKEAPI</span>
           </div>
         </section>
@@ -74,23 +107,19 @@ export default function App() {
               <p className="eyebrow">A COLEÇÃO</p>
               <h2 id="catalog-title">Pokémon</h2>
             </div>
-            <p className="catalog-count">
-              {catalog.length
-                ? `${numberFormatter.format(catalog.length)} para descobrir`
-                : 'Conectando ao catálogo'}
-            </p>
+            <p className="catalog-count">{countMessage}</p>
           </div>
 
           <form className="search-form" role="search" onSubmit={(event) => event.preventDefault()}>
             <label className="search-label" htmlFor="pokemon-search">
-              Pesquisar Pokémon pelo nome
+              Pesquisar Pokémon por nome ou número
             </label>
             <span className="search-icon" aria-hidden="true">⌕</span>
             <input
               id="pokemon-search"
               className="search-input"
               type="search"
-              placeholder="Experimente: pikachu"
+              placeholder="Ex.: pikachu ou 25"
               autoComplete="off"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -102,6 +131,15 @@ export default function App() {
               </button>
             )}
           </form>
+
+          <PokemonFilters
+            evolution={evolution}
+            maxTypes={MAX_SELECTED_TYPES}
+            onClear={clearFilters}
+            onEvolutionChange={setEvolution}
+            onTypeToggle={toggleType}
+            selectedTypes={selectedTypes}
+          />
 
           <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
             {statusMessage}
@@ -116,7 +154,7 @@ export default function App() {
                 Tentar novamente
               </button>
             </div>
-          ) : isLoading ? (
+          ) : isLoading || (isSearching && !pokemon.length) ? (
             <div className="loading-grid" aria-hidden="true">
               {Array.from({ length: 8 }, (_, index) => (
                 <div className="skeleton-card" key={index}>
@@ -138,8 +176,8 @@ export default function App() {
                   <button
                     className="load-more-button"
                     type="button"
-                    onClick={loadMore}
-                    disabled={isLoadingMore || isSearching}
+                    onClick={handleLoadMore}
+                    aria-disabled={isLoadingMore || isSearching}
                   >
                     {isLoadingMore ? 'Carregando...' : 'Carregar mais Pokémon'}
                     {!isLoadingMore && <span aria-hidden="true"> ↓</span>}
@@ -151,8 +189,12 @@ export default function App() {
             <div className="feedback-panel empty-panel">
               <span className="feedback-symbol" aria-hidden="true">?</span>
               <h3>Nenhum Pokémon encontrado.</h3>
-              <p>Confira a escrita ou tente outro nome.</p>
-              <button className="secondary-button" type="button" onClick={() => setQuery('')}>
+              <p>
+                {selectedTypes.length > 0 || evolution !== 'all'
+                  ? 'Nenhum Pokémon combina com a busca e os filtros escolhidos.'
+                  : 'Confira a escrita ou tente outro nome ou número.'}
+              </p>
+              <button className="secondary-button" type="button" onClick={clearAll}>
                 Ver catálogo completo
               </button>
             </div>
