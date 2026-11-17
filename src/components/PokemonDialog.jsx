@@ -11,7 +11,7 @@ const statLabels = {
   speed: 'Velocidade',
 }
 
-export default function PokemonDialog({ pokemon, onClose }) {
+export default function PokemonDialog({ pokemon, onClose, onChoose }) {
   const dialogRef = useRef(null)
 
   useEffect(() => {
@@ -126,6 +126,14 @@ export default function PokemonDialog({ pokemon, onClose }) {
             )}
           </section>
         )}
+
+        <button
+          className="choose-battle-button"
+          type="button"
+          onClick={() => onChoose(pokemon)}
+        >
+          Escolher para batalha <span aria-hidden="true">→</span>
+        </button>
       </article>
     </dialog>
   )

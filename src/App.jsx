@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import BattlePreview from './components/BattlePreview.jsx'
 import PokemonDialog from './components/PokemonDialog.jsx'
 import PokemonFilters from './components/PokemonFilters.jsx'
 import PokemonGrid from './components/PokemonGrid.jsx'
 import usePokedex, { MAX_SELECTED_TYPES } from './hooks/usePokedex.js'
+import { fetchPokemonDetails } from './services/pokeApi.js'
 
 const numberFormatter = new Intl.NumberFormat('pt-BR')
 
@@ -29,6 +31,13 @@ export default function App() {
   } = usePokedex()
   const [selectedPokemon, setSelectedPokemon] = useState(null)
   const [pendingFocusId, setPendingFocusId] = useState(null)
+  const [battlePlayer, setBattlePlayer] = useState(null)
+  const [battleOpponent, setBattleOpponent] = useState(null)
+  const [isLoadingOpponent, setIsLoadingOpponent] = useState(false)
+  const [battleError, setBattleError] = useState('')
+  const battleRequest = useRef(null)
+  const battleRequestId = useRef(0)
+  const battlePreviewRef = useRef(null)
 
   const isFiltering = Boolean(query.trim()) || selectedTypes.length > 0 || evolution !== 'all'
   const formattedMatches = totalMatches === null ? '' : numberFormatter.format(totalMatches)
@@ -57,9 +66,57 @@ export default function App() {
     setPendingFocusId(null)
   }, [pendingFocusId, pokemon])
 
+  useEffect(() => () => battleRequest.current?.abort(), [])
+
+  useEffect(() => {
+    if (!battlePlayer) return
+    battlePreviewRef.current?.focus({ preventScroll: true })
+    battlePreviewRef.current?.scrollIntoView({ block: 'start' })
+  }, [battlePlayer])
+
   async function handleLoadMore() {
     const firstNewPokemon = await loadMore()
     if (firstNewPokemon) setPendingFocusId(firstNewPokemon.id)
+  }
+
+  async function handleChooseForBattle(player) {
+    battleRequest.current?.abort()
+    const controller = new AbortController()
+    battleRequest.current = controller
+    const currentRequestId = ++battleRequestId.current
+    const possibleOpponents = catalog.filter((entry) => entry.id !== player.id)
+    const opponentEntry = possibleOpponents[Math.floor(Math.random() * possibleOpponents.length)]
+
+    setBattlePlayer(player)
+    setBattleOpponent(null)
+    setBattleError('')
+    setIsLoadingOpponent(Boolean(opponentEntry))
+    setSelectedPokemon(null)
+
+    if (!opponentEntry) {
+      setBattleError('Não foi possível encontrar um rival no catálogo.')
+      return
+    }
+
+    try {
+      const [opponent] = await fetchPokemonDetails([opponentEntry], controller.signal)
+      if (battleRequestId.current === currentRequestId) setBattleOpponent(opponent)
+    } catch {
+      if (battleRequestId.current === currentRequestId) {
+        setBattleError('Não foi possível carregar o rival. Tente novamente.')
+      }
+    } finally {
+      if (battleRequestId.current === currentRequestId) setIsLoadingOpponent(false)
+    }
+  }
+
+  function clearBattlePreview() {
+    battleRequest.current?.abort()
+    battleRequestId.current += 1
+    setBattlePlayer(null)
+    setBattleOpponent(null)
+    setIsLoadingOpponent(false)
+    setBattleError('')
   }
 
   return (
@@ -100,6 +157,18 @@ export default function App() {
             <span className="stamp-source">DADOS POKEAPI</span>
           </div>
         </section>
+
+        {battlePlayer && (
+          <BattlePreview
+            sectionRef={battlePreviewRef}
+            player={battlePlayer}
+            opponent={battleOpponent}
+            isLoadingOpponent={isLoadingOpponent}
+            error={battleError}
+            onRetry={() => handleChooseForBattle(battlePlayer)}
+            onClear={clearBattlePreview}
+          />
+        )}
 
         <section id="catalogo" className="catalog-section" aria-labelledby="catalog-title">
           <div className="catalog-heading">
@@ -209,7 +278,11 @@ export default function App() {
         </a>
       </footer>
 
-      <PokemonDialog pokemon={selectedPokemon} onClose={() => setSelectedPokemon(null)} />
+      <PokemonDialog
+        pokemon={selectedPokemon}
+        onClose={() => setSelectedPokemon(null)}
+        onChoose={handleChooseForBattle}
+      />
     </div>
   )
 }
