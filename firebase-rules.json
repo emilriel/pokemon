@@ -20,6 +20,7 @@
             ".validate": "$playerId.matches(/^p[a-z0-9]{1,20}$/) && newData.hasChildren(['isHost', 'masterName'])",
             "isHost": { ".validate": "newData.isBoolean()" },
             "masterName": { ".validate": "newData.isString() && newData.val().length <= 20" },
+            "ready": { ".validate": "newData.isBoolean()" },
             "joinedAt": { ".validate": "newData.isNumber()" },
             "$other": { ".validate": false }
           }

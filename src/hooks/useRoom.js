@@ -3,6 +3,7 @@ import {
   clearRoomFromLocation,
   codeFromLocation,
   createRoom,
+  everyoneReady,
   finishNaming,
   getPlayerId,
   joinRoom,
@@ -10,6 +11,7 @@ import {
   playerList,
   releaseOnDisconnect,
   setMasterName,
+  setReady,
   startNaming,
   watchRoom,
 } from '../services/rooms.js'
@@ -87,12 +89,13 @@ export default function useRoom() {
     return () => window.clearInterval(intervalId)
   }, [room?.phaseEndsAt])
 
-  // Passada a hora, só o anfitrião fecha a fase, para não haver duas escritas.
+  // A fase do nome fecha quando todos se declaram prontos ou quando o minuto
+  // acaba. Só o anfitrião escreve, para não haver duas escritas ao mesmo tempo.
   useEffect(() => {
-    if (!isHost || !code) return
-    if (room?.status !== 'naming' || secondsLeft === null || secondsLeft > 0) return
-    finishNaming(code)
-  }, [code, isHost, room?.status, secondsLeft])
+    if (!isHost || !code || room?.status !== 'naming') return
+    const tempoAcabou = secondsLeft !== null && secondsLeft <= 0
+    if (tempoAcabou || everyoneReady(room)) finishNaming(code)
+  }, [code, isHost, room, secondsLeft])
 
   async function run(action) {
     setIsBusy(true)
@@ -134,6 +137,7 @@ export default function useRoom() {
     playerId,
     room,
     saveMasterName: (name) => setMasterName({ code, playerId, masterName: name }),
+    setReady: (name, ready) => setReady({ code, playerId, masterName: name, ready }),
     secondsLeft,
     startNaming: () => startNaming(code),
     clearError: () => setError(''),

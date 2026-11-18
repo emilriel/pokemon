@@ -170,8 +170,8 @@ function Espera({ code, isHost, players, room, onStart, onLeave }) {
             <button
               className="load-more-button"
               type="button"
+              disabled={!isFull}
               onClick={onStart}
-              aria-disabled={!isFull}
             >
               Iniciar batalha
             </button>
@@ -192,21 +192,22 @@ function Espera({ code, isHost, players, room, onStart, onLeave }) {
   )
 }
 
-function NomeDoMestre({ me, players, secondsLeft, onSave }) {
+function NomeDoMestre({ me, players, secondsLeft, onSave, onReady }) {
   const [name, setName] = useState(me?.masterName || '')
   const saved = useRef('')
+  const isReady = Boolean(me?.ready)
 
   // Guarda o que foi digitado sem esperar o botão, caso o tempo acabe antes.
   useEffect(() => {
-    if (name === saved.current) return undefined
+    if (isReady || name === saved.current) return undefined
     const timeoutId = window.setTimeout(() => {
       saved.current = name
       onSave(name)
     }, 500)
     return () => window.clearTimeout(timeoutId)
-  }, [name, onSave])
+  }, [isReady, name, onSave])
 
-  const prontos = players.filter((player) => player.masterName).length
+  const prontos = players.filter((player) => player.ready).length
 
   return (
     <div className="room-naming">
@@ -214,7 +215,7 @@ function NomeDoMestre({ me, players, secondsLeft, onSave }) {
       <h3>Qual é o nome do seu mestre Pokémon?</h3>
       <p className="room-lobby-hint">
         {secondsLeft !== null ? `${secondsLeft} segundos` : 'Quase lá'} ·
-        {' '}{prontos} de {players.length} já escolheram
+        {' '}{prontos} de {players.length} {prontos === 1 ? 'pronto' : 'prontos'}
       </p>
 
       <label className="room-field">
@@ -223,16 +224,37 @@ function NomeDoMestre({ me, players, secondsLeft, onSave }) {
           type="text"
           maxLength={20}
           autoFocus
+          disabled={isReady}
           value={name}
           placeholder="Ex.: Matheus"
           onChange={(event) => setName(event.target.value)}
         />
       </label>
 
+      <div className="room-form-actions">
+        {isReady ? (
+          <>
+            <p className="room-lobby-hint">Esperando os outros jogadores.</p>
+            <button className="secondary-button" type="button" onClick={() => onReady(name, false)}>
+              Mudar meu nome
+            </button>
+          </>
+        ) : (
+          <button
+            className="load-more-button"
+            type="button"
+            disabled={!name.trim()}
+            onClick={() => onReady(name, true)}
+          >
+            Estou pronto
+          </button>
+        )}
+      </div>
+
       <ul className="room-players">
         {players.map((player) => (
-          <li className="room-player" key={player.id} data-ready={Boolean(player.masterName)}>
-            <span className="room-player-number">{player.masterName ? '✓' : '…'}</span>
+          <li className="room-player" key={player.id} data-ready={Boolean(player.ready)}>
+            <span className="room-player-number">{player.ready ? '✓' : '…'}</span>
             <span>{player.masterName || 'Escolhendo...'}</span>
           </li>
         ))}
@@ -251,6 +273,7 @@ export default function BattleRooms({
   onJoin,
   onLeave,
   onSaveMasterName,
+  onSetReady,
   onStartNaming,
   players,
   room,
@@ -290,6 +313,7 @@ export default function BattleRooms({
           players={players}
           secondsLeft={secondsLeft}
           onSave={onSaveMasterName}
+          onReady={onSetReady}
         />
       )}
 

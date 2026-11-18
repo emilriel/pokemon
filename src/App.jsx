@@ -143,6 +143,7 @@ export default function App() {
               onJoin={rooms.join}
               onLeave={() => { rooms.leave(); setBattleMode(null) }}
               onSaveMasterName={rooms.saveMasterName}
+              onSetReady={rooms.setReady}
               onStartNaming={rooms.startNaming}
               players={rooms.players}
               room={rooms.room}

@@ -18,7 +18,8 @@ import { database } from './firebase.js'
 //   hostId       identificador de quem criou
 //   status       'lobby' | 'naming' | 'ready'
 //   phaseEndsAt  quando a fase atual termina (só nas fases com relógio)
-//   players/{id} cada jogador: nome do mestre, se é o anfitrião e quando entrou
+//   players/{id} cada jogador: nome do mestre, se já se declarou pronto, se é
+//                o anfitrião e quando entrou
 //
 // Não há login: cada aparelho gera um identificador próprio e o guarda no
 // navegador. Isso basta para a sala saber quem é quem.
@@ -109,7 +110,7 @@ export async function createRoom({ gymName, maxPlayers, playerId }) {
         status: 'lobby',
         createdAt: serverTimestamp(),
         players: {
-          [playerId]: { isHost: true, masterName: '', joinedAt: serverTimestamp() },
+          [playerId]: { isHost: true, masterName: '', ready: false, joinedAt: serverTimestamp() },
         },
       }
     }), OFFLINE)
@@ -136,6 +137,7 @@ export async function joinRoom({ code, playerId }) {
   await withTimeout(update(ref(database, `rooms/${code}/players/${playerId}`), {
     isHost: false,
     masterName: '',
+    ready: false,
     joinedAt: serverTimestamp(),
   }), OFFLINE)
 
@@ -174,12 +176,26 @@ export function setMasterName({ code, playerId, masterName }) {
   })
 }
 
+// O jogador avisa que terminou. Quando todos avisam, a fase fecha sem esperar
+// o minuto inteiro.
+export function setReady({ code, playerId, masterName, ready }) {
+  return update(ref(database, `rooms/${code}/players/${playerId}`), {
+    masterName: masterName.trim().slice(0, 20),
+    ready,
+  })
+}
+
 // O anfitrião abre o minuto em que todos escrevem o nome do mestre.
 export function startNaming(code) {
   return update(ref(database, `rooms/${code}`), {
     status: 'naming',
     phaseEndsAt: Date.now() + NAMING_SECONDS * 1000,
   })
+}
+
+export function everyoneReady(room) {
+  const players = playerList(room)
+  return players.length > 0 && players.every((player) => player.ready)
 }
 
 export function finishNaming(code) {

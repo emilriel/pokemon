@@ -208,7 +208,11 @@ select.toolbar-select { padding-right: 32px; appearance: none; background-image:
 
 .room-naming, .room-ready { max-width: 520px; margin-top: 24px; }
 .room-naming h3, .room-ready h3 { margin: 4px 0 10px; font-family: 'Space Grotesk', sans-serif; font-size: 26px; }
-.room-naming .room-field { margin-bottom: 20px; }
+.room-naming .room-field { margin-bottom: 16px; }
+.room-naming .room-form-actions { margin-bottom: 22px; align-items: center; }
+.room-naming .room-lobby-hint { margin: 0; }
+.room-field input:disabled { background: #eef2ec; color: var(--muted); }
+.load-more-button:disabled, .secondary-button:disabled { cursor: not-allowed; opacity: 0.5; }
 
 .battle-screen { margin: 24px 0 48px; }
 .battle-turn { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; color: #e2eee6; }
