@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import BattleArena from './BattleArena.jsx'
-import { Comparacao, Sorteio } from './MatchScreens.jsx'
+import { Campeao, Chaveamento, Comparacao, FimDoConfronto, Sorteio } from './MatchScreens.jsx'
 import QrCode from './QrCode.jsx'
 import QrScanner from './QrScanner.jsx'
 import { MAX_PLAYERS, MIN_PLAYERS, isValidCode, roomLink } from '../services/rooms.js'
@@ -130,7 +130,7 @@ function Entrada({ onCreate, onJoin, isBusy }) {
   )
 }
 
-function Espera({ code, isHost, players, room, onStart, onLeave }) {
+function Espera({ code, isHost, players, room, onStart, onLeave, onFillWithBots }) {
   const isFull = players.length >= room.maxPlayers
 
   return (
@@ -156,7 +156,9 @@ function Espera({ code, isHost, players, room, onStart, onLeave }) {
           {players.map((player, index) => (
             <li className="room-player" key={player.id}>
               <span className="room-player-number">{index + 1}</span>
-              <span>{player.isHost ? 'Anfitrião' : 'Jogador'}</span>
+              <span>
+                {player.isBot ? player.masterName : player.isHost ? 'Anfitrião' : 'Jogador'}
+              </span>
             </li>
           ))}
           {Array.from({ length: Math.max(0, room.maxPlayers - players.length) }, (_, index) => (
@@ -169,14 +171,21 @@ function Espera({ code, isHost, players, room, onStart, onLeave }) {
 
         <div className="room-form-actions">
           {isHost ? (
-            <button
-              className="load-more-button"
-              type="button"
-              disabled={!isFull}
-              onClick={onStart}
-            >
-              Iniciar batalha
-            </button>
+            <>
+              <button
+                className="load-more-button"
+                type="button"
+                disabled={!isFull}
+                onClick={onStart}
+              >
+                Iniciar batalha
+              </button>
+              {!isFull && (
+                <button className="secondary-button" type="button" onClick={onFillWithBots}>
+                  Completar com o computador
+                </button>
+              )}
+            </>
           ) : (
             <p className="room-lobby-hint">O anfitrião começa quando a sala encher.</p>
           )}
@@ -266,14 +275,20 @@ function NomeDoMestre({ me, players, secondsLeft, onSave, onReady }) {
 }
 
 export default function BattleRooms({
+  bracket,
+  champion,
+  championName,
   code,
   error,
   isBusy,
+  isFighting,
   isHost,
   match,
   me,
-  myRoster,
+  myPick,
+  myTeam,
   onChooseMove,
+  onFillWithBots,
   onPick,
   onCreate,
   onJoin,
@@ -285,10 +300,8 @@ export default function BattleRooms({
   room,
   secondsLeft,
 }) {
-  // Durante o confronto a tela é só a arena, sem o cabeçalho das salas.
-  if (room && (room.status === 'battle' || room.status === 'finished')) {
-    const acabou = room.status === 'finished'
-
+  // Durante a luta a tela é só a arena, sem o cabeçalho das salas.
+  if (room && room.status === 'battle') {
     return (
       <BattleArena
         leaveLabel={isHost ? 'Encerrar a sala' : 'Sair da sala'}
@@ -298,11 +311,14 @@ export default function BattleRooms({
         opponent={match?.rival}
         opponentLabel={(match?.rivalName || 'RIVAL').toUpperCase()}
         player={match?.me}
+        playerLabel={(match?.meName || 'SEU POKÉMON').toUpperCase()}
         round={match?.round || 1}
         secondsLeft={secondsLeft ?? 0}
-        status={acabou ? 'finished' : match?.myMove ? 'resolving' : 'choosing'}
-        waitingText={match?.myMove ? 'esperando o rival' : 'aguarde'}
-        winner={acabou ? (match?.iWon ? 'player' : match?.winner === 'draw' ? 'draw' : 'opponent') : null}
+        status={isFighting ? (match?.myMove ? 'resolving' : 'choosing') : 'resolving'}
+        waitingText={isFighting
+          ? (match?.myMove ? 'esperando o rival' : 'aguarde')
+          : 'você está assistindo'}
+        winner={null}
       />
     )
   }
@@ -332,6 +348,7 @@ export default function BattleRooms({
           room={room}
           onStart={onStartNaming}
           onLeave={onLeave}
+          onFillWithBots={onFillWithBots}
         />
       )}
 
@@ -357,21 +374,45 @@ export default function BattleRooms({
               </li>
             ))}
           </ul>
-          <p className="room-lobby-hint">Sorteando os Pokémon...</p>
+          <p className="room-lobby-hint">Sorteando os times...</p>
         </div>
       )}
 
-      {room && room.status === 'draft' && (
-        <Sorteio
-          roster={myRoster}
-          picked={room.picks?.[me?.id]}
-          secondsLeft={secondsLeft}
-          onPick={onPick}
-        />
+      {room && room.status === 'pick' && (
+        <>
+          <Chaveamento bracket={bracket} players={players} />
+          <Sorteio
+            team={myTeam}
+            picked={myPick}
+            secondsLeft={secondsLeft}
+            onPick={onPick}
+            euLuto={isFighting}
+            rivalName={match?.rivalName || 'seu rival'}
+          />
+        </>
       )}
 
       {room && room.status === 'preview' && (
         <Comparacao match={match} secondsLeft={secondsLeft} />
+      )}
+
+      {room && room.status === 'roundEnd' && (
+        <>
+          <Chaveamento bracket={bracket} players={players} />
+          <FimDoConfronto match={match} />
+        </>
+      )}
+
+      {room && room.status === 'finished' && (
+        <>
+          <Chaveamento bracket={bracket} players={players} />
+          <Campeao
+            championName={championName}
+            souEu={champion === me?.id}
+            isHost={isHost}
+            onLeave={onLeave}
+          />
+        </>
       )}
     </section>
   )

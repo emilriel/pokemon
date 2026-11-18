@@ -193,8 +193,29 @@ export function startNaming(code) {
   })
 }
 
+// Preenche as vagas que sobraram com treinadores do computador, para a sala
+// começar mesmo sem gente suficiente. Eles já entram prontos.
+export function fillWithBots({ code, room }) {
+  const atuais = playerList(room)
+  const faltam = room.maxPlayers - atuais.length
+  if (faltam <= 0) return Promise.resolve()
+
+  const novos = {}
+  for (let i = 0; i < faltam; i += 1) {
+    novos[`bot${i + 1}`] = {
+      isHost: false,
+      isBot: true,
+      masterName: `Treinador IA ${i + 1}`,
+      ready: true,
+      joinedAt: Date.now() + i,
+    }
+  }
+
+  return update(ref(database, `rooms/${code}/players`), novos)
+}
+
 export function everyoneReady(room) {
-  const players = playerList(room)
+  const players = humanPlayers(room)
   return players.length > 0 && players.every((player) => player.ready)
 }
 
@@ -206,4 +227,8 @@ export function playerList(room) {
   return Object.entries(room?.players || {})
     .map(([id, data]) => ({ id, ...data }))
     .sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0))
+}
+
+export function humanPlayers(room) {
+  return playerList(room).filter((player) => !player.isBot)
 }

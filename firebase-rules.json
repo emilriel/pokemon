@@ -11,20 +11,27 @@
         "gymName": { ".validate": "newData.isString() && newData.val().length <= 24" },
         "maxPlayers": { ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 8 && newData.val() % 2 === 0" },
         "hostId": { ".validate": "newData.isString() && newData.val().length <= 40" },
-        "status": { ".validate": "newData.val() === 'lobby' || newData.val() === 'naming' || newData.val() === 'ready'" },
+        "status": { ".validate": "newData.isString() && newData.val().length <= 12" },
         "createdAt": { ".validate": "newData.isNumber()" },
         "phaseEndsAt": { ".validate": "newData.isNumber()" },
 
         "players": {
           "$playerId": {
-            ".validate": "$playerId.matches(/^p[a-z0-9]{1,20}$/) && newData.hasChildren(['isHost', 'masterName'])",
+            ".validate": "$playerId.matches(/^(p|bot)[a-z0-9]{1,20}$/) && newData.hasChildren(['isHost', 'masterName'])",
             "isHost": { ".validate": "newData.isBoolean()" },
+            "isBot": { ".validate": "newData.isBoolean()" },
             "masterName": { ".validate": "newData.isString() && newData.val().length <= 20" },
             "ready": { ".validate": "newData.isBoolean()" },
             "joinedAt": { ".validate": "newData.isNumber()" },
             "$other": { ".validate": false }
           }
         },
+
+        "teams": { ".validate": true },
+        "picks": { ".validate": true },
+        "match": { ".validate": true },
+        "bracket": { ".validate": true },
+        "champion": { ".validate": "newData.isString() || !newData.exists()" },
 
         "$other": { ".validate": false }
       }

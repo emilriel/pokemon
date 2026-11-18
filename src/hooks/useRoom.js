@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   applyTurn,
-  everyoneMoved,
-  everyonePicked,
+  combatantsMoved,
+  currentPair,
+  isFighting,
   matchView,
+  nextMatch,
+  pairReadyToFight,
   setPick,
   startBattle,
-  startDraft,
-  startPreview,
+  startMatch,
+  startTournament,
   submitMove,
 } from '../services/match.js'
 import {
@@ -15,8 +18,10 @@ import {
   codeFromLocation,
   createRoom,
   everyoneReady,
+  fillWithBots,
   finishNaming,
   getPlayerId,
+  humanPlayers,
   joinRoom,
   leaveRoom,
   playerList,
@@ -89,7 +94,7 @@ export default function useRoom(catalog = []) {
       .finally(() => setIsBusy(false))
   }, [attach, playerId])
 
-  // Relógio das fases com tempo (hoje só a do nome do mestre).
+  // Relógio das fases com tempo.
   useEffect(() => {
     if (!room?.phaseEndsAt) {
       setSecondsLeft(null)
@@ -105,16 +110,8 @@ export default function useRoom(catalog = []) {
     return () => window.clearInterval(intervalId)
   }, [room?.phaseEndsAt])
 
-  // A fase do nome fecha quando todos se declaram prontos ou quando o minuto
-  // acaba. Só o anfitrião escreve, para não haver duas escritas ao mesmo tempo.
-  useEffect(() => {
-    if (!isHost || !code || room?.status !== 'naming') return
-    const tempoAcabou = secondsLeft !== null && secondsLeft <= 0
-    if (tempoAcabou || everyoneReady(room)) finishNaming(code)
-  }, [code, isHost, room, secondsLeft])
-
-  // Daqui para baixo, só o anfitrião escreve: ele sorteia, monta os lutadores e
-  // resolve cada rodada. Os outros aparelhos apenas mandam a própria escolha.
+  // Daqui para baixo, só o anfitrião escreve: ele sorteia, monta os lutadores,
+  // joga pelos treinadores do computador e resolve cada rodada.
   const advance = useCallback(async (key, action) => {
     if (phaseLock.current === key) return
     phaseLock.current = key
@@ -128,32 +125,57 @@ export default function useRoom(catalog = []) {
     }
   }, [])
 
+  const newRequest = useCallback(() => {
+    phaseRequest.current?.abort()
+    phaseRequest.current = new AbortController()
+    return phaseRequest.current.signal
+  }, [])
+
   useEffect(() => {
     if (!isHost || !code || !room) return
     const expirou = secondsLeft !== null && secondsLeft <= 0
 
-    if (room.status === 'ready' && catalog.length) {
-      advance(`draft:${code}`, () => startDraft({ code, room, catalog }))
-      return
-    }
+    switch (room.status) {
+      case 'naming':
+        if (expirou || everyoneReady(room)) advance(`naming:${code}`, () => finishNaming(code))
+        return
 
-    if (room.status === 'draft' && (expirou || everyonePicked(room))) {
-      phaseRequest.current?.abort()
-      const controller = new AbortController()
-      phaseRequest.current = controller
-      advance(`preview:${code}`, () => startPreview({ code, room, signal: controller.signal }))
-      return
-    }
+      case 'ready':
+        if (catalog.length) {
+          advance(`torneio:${code}`, () => startTournament({ code, room, catalog, signal: newRequest() }))
+        }
+        return
 
-    if (room.status === 'preview' && expirou) {
-      advance(`battle:${code}`, () => startBattle({ code }))
-      return
-    }
+      case 'pick':
+        if (expirou || pairReadyToFight(room, players)) {
+          advance(`match:${code}:${room.bracket?.round}:${room.bracket?.current}`,
+            () => startMatch({ code, room, players, signal: newRequest() }))
+        }
+        return
 
-    if (room.status === 'battle' && (expirou || everyoneMoved(room))) {
-      advance(`turn:${code}:${room.match?.round}`, () => applyTurn({ code, room }))
+      case 'preview':
+        if (expirou) {
+          advance(`battle:${code}:${room.bracket?.round}:${room.bracket?.current}`, () => startBattle({ code }))
+        }
+        return
+
+      case 'battle':
+        if (expirou || combatantsMoved(room, players)) {
+          advance(`turn:${code}:${room.bracket?.current}:${room.match?.round}`,
+            () => applyTurn({ code, room, players }))
+        }
+        return
+
+      case 'roundEnd':
+        if (expirou) {
+          advance(`proximo:${code}:${room.bracket?.round}:${room.bracket?.current}`,
+            () => nextMatch({ code, room }))
+        }
+        return
+
+      default:
     }
-  }, [advance, catalog, code, isHost, room, secondsLeft])
+  }, [advance, catalog, code, isHost, newRequest, players, room, secondsLeft])
 
   async function run(action) {
     setIsBusy(true)
@@ -169,6 +191,13 @@ export default function useRoom(catalog = []) {
   }
 
   return {
+    bracket: room?.bracket || null,
+    champion: room?.champion || null,
+    championName: room?.champion
+      ? players.find((player) => player.id === room.champion)?.masterName || 'Treinador'
+      : null,
+    chooseMove: (moveId) => submitMove({ code, playerId, moveId }),
+    clearError: () => setError(''),
     code,
     create: (gymName, maxPlayers) => run(async () => {
       const created = await createRoom({ gymName, maxPlayers, playerId })
@@ -176,7 +205,10 @@ export default function useRoom(catalog = []) {
       return created
     }),
     error,
+    fillWithBots: () => run(() => fillWithBots({ code, room })),
+    humans: humanPlayers(room),
     isBusy,
+    isFighting: isFighting(room, playerId),
     isHost,
     join: (wanted) => run(async () => {
       const joined = await joinRoom({ code: wanted, playerId })
@@ -190,18 +222,18 @@ export default function useRoom(catalog = []) {
       setCode(null)
       if (leaving) await leaveRoom({ code: leaving, playerId, isHost })
     }),
+    match: matchView(room, playerId, players),
     me,
+    myPick: room?.picks?.[playerId],
+    myTeam: room?.teams?.[playerId] || [],
+    pair: currentPair(room),
+    pick: (index) => setPick({ code, playerId, index }),
     players,
     playerId,
     room,
-    match: matchView(room, playerId),
-    myRoster: room?.roster?.[playerId] || [],
-    pick: (pokemonId) => setPick({ code, playerId, pokemonId }),
-    chooseMove: (moveId) => submitMove({ code, playerId, moveId }),
     saveMasterName: (name) => setMasterName({ code, playerId, masterName: name }),
-    setReady: (name, ready) => setReady({ code, playerId, masterName: name, ready }),
     secondsLeft,
+    setReady: (name, ready) => setReady({ code, playerId, masterName: name, ready }),
     startNaming: () => startNaming(code),
-    clearError: () => setError(''),
   }
 }

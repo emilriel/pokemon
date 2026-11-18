@@ -142,9 +142,15 @@ export default function App() {
               onCreate={rooms.create}
               onJoin={rooms.join}
               onLeave={() => { rooms.leave(); setBattleMode(null) }}
+              bracket={rooms.bracket}
+              champion={rooms.champion}
+              championName={rooms.championName}
+              isFighting={rooms.isFighting}
               match={rooms.match}
-              myRoster={rooms.myRoster}
+              myPick={rooms.myPick}
+              myTeam={rooms.myTeam}
               onChooseMove={rooms.chooseMove}
+              onFillWithBots={rooms.fillWithBots}
               onPick={rooms.pick}
               onSaveMasterName={rooms.saveMasterName}
               onSetReady={rooms.setReady}

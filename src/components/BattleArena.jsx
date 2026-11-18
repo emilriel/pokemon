@@ -75,6 +75,7 @@ export default function BattleArena({
   opponent,
   opponentLabel = 'RIVAL',
   player,
+  playerLabel,
   round,
   secondsLeft,
   status,
@@ -140,7 +141,7 @@ export default function BattleArena({
       )}
 
       <div className="battle-arena" aria-label="Arena de batalha">
-        <Fighter fighter={player} side="player" />
+        <Fighter fighter={player} side="player" sideLabel={playerLabel} />
         <span className="battle-versus" aria-hidden="true">VS</span>
         <Fighter fighter={opponent} side="opponent" sideLabel={opponentLabel} />
       </div>
@@ -153,7 +154,7 @@ export default function BattleArena({
             </button>
           )}
           <button className="secondary-button" type="button" onClick={onLeave}>
-            {leaveLabel}
+            {onRematch ? 'Escolher outro Pokémon' : leaveLabel}
           </button>
         </div>
       ) : (

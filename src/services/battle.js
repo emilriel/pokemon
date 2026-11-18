@@ -227,6 +227,33 @@ export function resolveTurn({ player, opponent, playerMove, opponentMove, random
   }
 }
 
+// Joga a luta inteira sozinha, para confrontos em que ninguém está no comando
+// (dois treinadores do computador). Devolve os dois ao final e quem venceu.
+export function simulateMatch(fighterA, fighterB, maxTurns = 60) {
+  let a = { ...fighterA }
+  let b = { ...fighterB }
+  const events = []
+
+  for (let turn = 0; turn < maxTurns; turn += 1) {
+    const result = resolveTurn({
+      player: a,
+      opponent: b,
+      playerMove: chooseMoveForComputer(a, b),
+      opponentMove: chooseMoveForComputer(b, a),
+    })
+
+    a = result.player
+    b = result.opponent
+    events.push(...result.events)
+
+    if (result.winner) return { a, b, winner: result.winner, events }
+  }
+
+  // Empate por tempo: ganha quem estiver com mais vida.
+  const winner = a.currentHP === b.currentHP ? 'draw' : a.currentHP > b.currentHP ? 'player' : 'opponent'
+  return { a, b, winner, events }
+}
+
 // Escolha do computador: prefere o golpe que mais machuca neste confronto.
 // Erra de propósito de vez em quando, para não ficar impossível de vencer.
 export function chooseMoveForComputer(attacker, defender, random = Math.random) {
