@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import BattleArena from './components/BattleArena.jsx'
+import BattleRooms from './components/BattleRooms.jsx'
 import CatalogToolbar from './components/CatalogToolbar.jsx'
 import PokemonDialog from './components/PokemonDialog.jsx'
 import PokemonGrid from './components/PokemonGrid.jsx'
 import useBattle from './hooks/useBattle.js'
+import useRoom from './hooks/useRoom.js'
 import usePokedex, { MAX_SELECTED_TYPES } from './hooks/usePokedex.js'
 
 const numberFormatter = new Intl.NumberFormat('pt-BR')
@@ -32,7 +34,9 @@ export default function App() {
   const [selectedPokemon, setSelectedPokemon] = useState(null)
   const [pendingFocusId, setPendingFocusId] = useState(null)
   const [view, setView] = useState('pokedex')
+  const [battleMode, setBattleMode] = useState(null)
   const battle = useBattle(catalog)
+  const rooms = useRoom()
 
   const isFiltering = Boolean(query.trim()) || selectedTypes.length > 0 || evolution !== 'all'
   const formattedMatches = totalMatches === null ? '' : numberFormatter.format(totalMatches)
@@ -61,6 +65,14 @@ export default function App() {
     setPendingFocusId(null)
   }, [pendingFocusId, pokemon])
 
+  // Quem abre o site pelo QR Code de uma sala já entra por ela.
+  useEffect(() => {
+    if (rooms.room || rooms.code) {
+      setView('battle')
+      setBattleMode('amigos')
+    }
+  }, [rooms.code, rooms.room])
+
   async function handleLoadMore() {
     const firstNewPokemon = await loadMore()
     if (firstNewPokemon) setPendingFocusId(firstNewPokemon.id)
@@ -69,6 +81,7 @@ export default function App() {
   function handleChooseForBattle(chosen) {
     setSelectedPokemon(null)
     setView('battle')
+    setBattleMode('computador')
     window.scrollTo({ top: 0 })
     battle.start(chosen)
   }
@@ -80,6 +93,7 @@ export default function App() {
 
   function leaveBattle() {
     battle.leave()
+    setBattleMode(null)
   }
 
   return (
@@ -118,15 +132,46 @@ export default function App() {
         <div id="conteudo" tabIndex={-1} className="sr-only" />
 
         {view === 'battle' ? (
-          battle.status === 'idle' ? (
+          battleMode === 'amigos' ? (
+            <BattleRooms
+              code={rooms.code}
+              error={rooms.error}
+              isBusy={rooms.isBusy}
+              isHost={rooms.isHost}
+              me={rooms.me}
+              onCreate={rooms.create}
+              onJoin={rooms.join}
+              onLeave={() => { rooms.leave(); setBattleMode(null) }}
+              onSaveMasterName={rooms.saveMasterName}
+              onStartNaming={rooms.startNaming}
+              players={rooms.players}
+              room={rooms.room}
+              secondsLeft={rooms.secondsLeft}
+            />
+          ) : battle.status === 'idle' ? (
             <section className="battle-intro" aria-labelledby="battle-intro-title">
               <p className="eyebrow">MÓDULO 02 · BATALHA</p>
               <h2 id="battle-intro-title">Modo batalha</h2>
               <p className="battle-intro-text">
-                Escolha um Pokémon na Pokédex e clique em <strong>Escolher para batalha</strong>,
-                ou deixe o sorteio decidir por você. O rival é sorteado e a luta acontece por
-                rodadas: você escolhe o golpe, o tipo conta, e vence quem zerar a vida do outro.
+                A luta acontece por rodadas: você escolhe o golpe, o tipo conta, e vence quem
+                zerar a vida do outro.
               </p>
+
+              <div className="battle-modes">
+                <button className="room-choice" type="button" onClick={() => setBattleMode('amigos')}>
+                  <span className="room-choice-title">Jogar com amigos</span>
+                  <span className="room-choice-text">
+                    Crie uma sala e chame a galera pelo código ou pelo QR Code.
+                  </span>
+                </button>
+                <div className="room-choice room-choice-static">
+                  <span className="room-choice-title">Treinar contra o computador</span>
+                  <span className="room-choice-text">
+                    Escolha um Pokémon na Pokédex e clique em <strong>Escolher para batalha</strong>,
+                    ou sorteie um agora.
+                  </span>
+                </div>
+              </div>
               {battle.error && (
                 <div className="feedback-panel" role="alert">
                   <span className="feedback-symbol" aria-hidden="true">!</span>
@@ -148,7 +193,7 @@ export default function App() {
                 </button>
               </div>
               <p className="battle-intro-note">
-                Em breve: salas com código e QR Code para jogar contra outra pessoa.
+                O sorteio dos Pokémon e o chaveamento do torneio entram na próxima etapa.
               </p>
             </section>
           ) : (

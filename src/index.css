@@ -169,6 +169,47 @@ select.toolbar-select { padding-right: 32px; appearance: none; background-image:
 .battle-intro-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .battle-intro-note { margin: 22px 0 0; color: var(--muted); font-size: 13px; }
 
+.battle-modes, .room-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 22px 0 0; }
+.room-choice { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 18px; border: 1px solid var(--control-line); border-radius: 10px; background: #fff; text-align: left; cursor: pointer; }
+.room-choice:hover { border-color: var(--forest); background: var(--leaf); }
+.room-choice-static { cursor: default; background: #eef2ec; }
+.room-choice-static:hover { border-color: var(--control-line); background: #eef2ec; }
+.room-choice-title { font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 700; }
+.room-choice-text { color: var(--muted); font-size: 14px; line-height: 1.5; }
+
+.rooms-screen { max-width: 900px; padding: 40px 0 72px; }
+.rooms-header h2 { margin: 0 0 6px; font-family: 'Space Grotesk', sans-serif; font-size: 36px; line-height: 1.1; }
+.room-form { max-width: 460px; display: grid; gap: 16px; margin-top: 24px; }
+.room-form h3 { margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 21px; }
+.room-field { display: grid; gap: 6px; font-size: 14px; font-weight: 600; }
+.room-field input, .room-field select { min-height: 46px; padding: 0 12px; border: 1px solid var(--control-line); border-radius: 7px; background: #fff; color: var(--ink); font-size: 16px; font-weight: 400; }
+.room-field input:focus-visible, .room-field select:focus-visible { outline: 3px solid var(--tomato); outline-offset: 2px; }
+.room-code-input { font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 700; letter-spacing: 7px; text-align: center; }
+.room-form-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.room-lobby { display: grid; grid-template-columns: 1fr 260px; gap: 32px; align-items: start; margin-top: 24px; }
+.room-lobby-main h3 { margin: 4px 0 16px; font-family: 'Space Grotesk', sans-serif; font-size: 28px; }
+.room-code-display { display: flex; gap: 7px; margin: 0 0 12px; }
+.room-code-digit { width: 42px; height: 54px; display: grid; place-items: center; border: 1px solid var(--forest); border-radius: 7px; background: var(--leaf); font-family: 'Space Grotesk', sans-serif; font-size: 25px; font-weight: 700; }
+.room-lobby-hint { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
+.room-players { display: grid; gap: 7px; margin: 0 0 22px; padding: 0; list-style: none; }
+.room-player { display: flex; align-items: center; gap: 11px; min-height: 44px; padding: 0 13px; border: 1px solid var(--line); border-radius: 7px; background: #fff; font-size: 14px; }
+.room-player[data-ready='true'] { border-color: var(--forest); background: var(--leaf); }
+.room-player-empty { border-style: dashed; color: var(--muted); background: transparent; }
+.room-player-number { width: 26px; height: 26px; flex: 0 0 26px; display: grid; place-items: center; border-radius: 50%; background: #e5ebe4; font-size: 12px; font-weight: 700; }
+.room-qr { display: grid; gap: 10px; justify-items: center; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.room-qr p { margin: 0; color: var(--muted); font-size: 13px; text-align: center; }
+.qr-image { width: 100%; max-width: 210px; height: auto; display: block; }
+.qr-image-loading { aspect-ratio: 1; background: #eef2ec; }
+.qr-fallback { color: var(--muted); font-size: 13px; }
+.qr-scanner { display: grid; gap: 10px; justify-items: start; }
+.qr-scanner-view { width: 100%; max-width: 320px; overflow: hidden; border: 1px solid var(--control-line); border-radius: 9px; background: #000; }
+.qr-scanner-error { margin: 0; color: #a04431; font-size: 13px; }
+
+.room-naming, .room-ready { max-width: 520px; margin-top: 24px; }
+.room-naming h3, .room-ready h3 { margin: 4px 0 10px; font-family: 'Space Grotesk', sans-serif; font-size: 26px; }
+.room-naming .room-field { margin-bottom: 20px; }
+
 .battle-screen { margin: 24px 0 48px; }
 .battle-turn { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; color: #e2eee6; }
 .battle-round { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; }
@@ -295,6 +336,11 @@ select.toolbar-select { padding-right: 32px; appearance: none; background-image:
 	.type-menu { width: min(360px, calc(100vw - 48px)); }
 	.move-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 	.battle-intro h2 { font-size: 30px; }
+	.battle-modes, .room-choices { grid-template-columns: 1fr; }
+	.rooms-header h2 { font-size: 28px; }
+	.room-lobby { grid-template-columns: 1fr; gap: 24px; }
+	.room-qr { justify-self: stretch; }
+	.room-code-digit { width: 36px; height: 48px; font-size: 21px; }
 	.topbar { gap: 10px; padding: 0 14px; }
 	.brand span:last-child { display: none; }
 	.topbar-tab { min-height: 38px; padding: 0 11px; font-size: 13px; }
