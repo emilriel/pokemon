@@ -169,13 +169,19 @@ export default function App() {
                     Crie uma sala e chame a galera pelo código ou pelo QR Code.
                   </span>
                 </button>
-                <div className="room-choice room-choice-static">
+                <button
+                  className="room-choice"
+                  type="button"
+                  disabled={!catalog.length}
+                  onClick={handleRandomFighter}
+                >
                   <span className="room-choice-title">Treinar contra o computador</span>
                   <span className="room-choice-text">
-                    Escolha um Pokémon na Pokédex e clique em <strong>Escolher para batalha</strong>,
-                    ou sorteie um agora.
+                    {catalog.length
+                      ? 'Sorteamos um Pokémon para você e um rival, e a luta começa.'
+                      : 'Carregando o catálogo...'}
                   </span>
-                </div>
+                </button>
               </div>
               {battle.error && (
                 <div className="feedback-panel" role="alert">
@@ -185,16 +191,8 @@ export default function App() {
                 </div>
               )}
               <div className="battle-intro-actions">
-                <button
-                  className="load-more-button"
-                  type="button"
-                  onClick={handleRandomFighter}
-                  aria-disabled={!catalog.length}
-                >
-                  Sortear meu Pokémon
-                </button>
                 <button className="secondary-button" type="button" onClick={() => setView('pokedex')}>
-                  Abrir a Pokédex
+                  Escolher um Pokémon na Pokédex
                 </button>
               </div>
               <p className="battle-intro-note">

@@ -172,8 +172,8 @@ select.toolbar-select { padding-right: 32px; appearance: none; background-image:
 .battle-modes, .room-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 22px 0 0; }
 .room-choice { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 18px; border: 1px solid var(--control-line); border-radius: 10px; background: #fff; text-align: left; cursor: pointer; }
 .room-choice:hover { border-color: var(--forest); background: var(--leaf); }
-.room-choice-static { cursor: default; background: #eef2ec; }
-.room-choice-static:hover { border-color: var(--control-line); background: #eef2ec; }
+.room-choice:disabled { cursor: not-allowed; opacity: 0.6; }
+.room-choice:disabled:hover { border-color: var(--control-line); background: #fff; }
 .room-choice-title { font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 700; }
 .room-choice-text { color: var(--muted); font-size: 14px; line-height: 1.5; }
 
