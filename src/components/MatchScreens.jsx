@@ -14,30 +14,58 @@ function Tipos({ types }) {
   )
 }
 
-export function Chaveamento({ bracket, players }) {
+export function Chaveamento({ bracket, players, playerId }) {
   if (!bracket) return null
 
   const nome = (id) => players.find((player) => player.id === id)?.masterName || '—'
+  const fases = [...(bracket.history || []), { round: bracket.round, pairs: bracket.pairs }]
+
+  // As fases que ainda não aconteceram entram como vagas em aberto, para o
+  // quadro mostrar o caminho inteiro até a final desde o começo.
+  let quantos = bracket.pairs.length
+  for (let round = bracket.round + 1; round <= bracket.totalRounds; round += 1) {
+    quantos = Math.ceil(quantos / 2)
+    fases.push({ round, pairs: Array.from({ length: quantos }, () => ({ a: null, b: null, winner: null })) })
+  }
+
+  function Vaga({ id, pair }) {
+    if (!id) return <span className="bracket-slot bracket-slot-open">A definir</span>
+
+    const venceu = pair.winner === id
+    const perdeu = pair.winner && pair.winner !== id
+
+    return (
+      <span className="bracket-slot" data-winner={venceu} data-out={perdeu} data-me={id === playerId}>
+        {nome(id)}
+        {id === playerId && <span className="bracket-you"> (você)</span>}
+      </span>
+    )
+  }
 
   return (
-    <div className="bracket">
-      <p className="bracket-title">
-        {nomeDaFase(bracket.round, bracket.totalRounds)}
-      </p>
-      <ol className="bracket-pairs">
-        {bracket.pairs.map((pair, index) => (
-          <li
-            className="bracket-pair"
-            key={`${pair.a}-${index}`}
-            data-current={index === bracket.current}
-            data-done={Boolean(pair.winner)}
-          >
-            <span data-winner={pair.winner === pair.a}>{nome(pair.a)}</span>
-            <span className="bracket-vs" aria-hidden="true">×</span>
-            <span data-winner={pair.winner === pair.b}>{pair.b ? nome(pair.b) : 'passa direto'}</span>
-          </li>
-        ))}
-      </ol>
+    <div className="bracket-board">
+      <h3 className="sr-only">Chaveamento do torneio</h3>
+      {fases.map((fase) => (
+        <section className="bracket-round" key={fase.round} data-current={fase.round === bracket.round}>
+          <h4>{nomeDaFase(fase.round, bracket.totalRounds)}</h4>
+          <ol className="bracket-matches">
+            {fase.pairs.map((pair, index) => (
+              <li
+                className="bracket-match"
+                key={`${fase.round}-${index}`}
+                data-current={fase.round === bracket.round && index === bracket.current}
+                data-done={Boolean(pair.winner)}
+              >
+                <Vaga id={pair.a} pair={pair} />
+                <span className="bracket-vs" aria-hidden="true">×</span>
+                {pair.a && !pair.b
+                  ? <span className="bracket-slot bracket-slot-open">passa direto</span>
+                  : <Vaga id={pair.b} pair={pair} />}
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))}
     </div>
   )
 }
@@ -140,13 +168,17 @@ export function Comparacao({ match, secondsLeft }) {
   )
 }
 
-export function FimDoConfronto({ match }) {
+export function FimDoConfronto({ match, bracket }) {
+  const proximaFase = bracket && bracket.round < bracket.totalRounds
+    ? nomeDaFase(bracket.round + 1, bracket.totalRounds)
+    : 'Final'
+
   return (
     <div className="room-ready">
       <p className="eyebrow">RESULTADO</p>
       <h3>
         {match?.euLuto
-          ? match.iWon ? 'Você passou de fase!' : 'Você foi eliminado.'
+          ? match.iWon ? `Você passou para a ${proximaFase.toLowerCase()}!` : 'Você foi eliminado.'
           : `${match?.winnerName || 'O vencedor'} passou de fase.`}
       </h3>
       <p className="room-lobby-hint">Preparando o próximo confronto...</p>

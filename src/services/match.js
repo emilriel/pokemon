@@ -79,7 +79,7 @@ export async function startTournament({ code, room, catalog, signal }) {
     picks: null,
     match: null,
     champion: null,
-    bracket: { round: 1, totalRounds, current: 0, pairs: formaPares(ordem) },
+    bracket: { round: 1, totalRounds, current: 0, pairs: formaPares(ordem), history: null },
   })
 }
 
@@ -311,6 +311,7 @@ export function nextMatch({ code, room }) {
       totalRounds: bracket.totalRounds,
       current: 0,
       pairs: formaPares(embaralha(vencedores)),
+      history: [...(bracket.history || []), { round: bracket.round, pairs: bracket.pairs }],
     },
   })
 }

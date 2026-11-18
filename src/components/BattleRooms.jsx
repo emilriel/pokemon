@@ -380,7 +380,7 @@ export default function BattleRooms({
 
       {room && room.status === 'pick' && (
         <>
-          <Chaveamento bracket={bracket} players={players} />
+          <Chaveamento bracket={bracket} players={players} playerId={me?.id} />
           <Sorteio
             team={myTeam}
             picked={myPick}
@@ -398,14 +398,14 @@ export default function BattleRooms({
 
       {room && room.status === 'roundEnd' && (
         <>
-          <Chaveamento bracket={bracket} players={players} />
-          <FimDoConfronto match={match} />
+          <Chaveamento bracket={bracket} players={players} playerId={me?.id} />
+          <FimDoConfronto match={match} bracket={bracket} />
         </>
       )}
 
       {room && room.status === 'finished' && (
         <>
-          <Chaveamento bracket={bracket} players={players} />
+          <Chaveamento bracket={bracket} players={players} playerId={me?.id} />
           <Campeao
             championName={championName}
             souEu={champion === me?.id}

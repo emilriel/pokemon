@@ -230,6 +230,21 @@ select.toolbar-select { padding-right: 32px; appearance: none; background-image:
 .compare-stats dt { color: var(--muted); font-size: 13px; }
 .compare-stats dd { margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 700; }
 .compare-grid .battle-versus { background: var(--forest); }
+
+.bracket-board { display: flex; gap: 14px; margin: 20px 0 26px; padding-bottom: 6px; overflow-x: auto; }
+.bracket-round { min-width: 190px; flex: 1 0 190px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.bracket-round[data-current='true'] { border-color: var(--forest); background: var(--leaf); }
+.bracket-round h4 { margin: 0 0 10px; font-family: 'Space Grotesk', sans-serif; font-size: 13px; letter-spacing: 0.4px; text-transform: uppercase; }
+.bracket-matches { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.bracket-match { display: grid; gap: 2px; padding: 8px; border: 1px solid var(--line); border-radius: 7px; background: #fff; }
+.bracket-match[data-current='true'] { border-color: var(--tomato); border-width: 2px; padding: 7px; }
+.bracket-slot { font-size: 13px; overflow-wrap: anywhere; }
+.bracket-slot[data-winner='true'] { color: var(--forest); font-weight: 700; }
+.bracket-slot[data-out='true'] { color: var(--muted); text-decoration: line-through; }
+.bracket-slot[data-me='true'] { color: #a0431f; }
+.bracket-slot-open { color: var(--muted); font-size: 12px; font-style: italic; }
+.bracket-you { font-size: 12px; font-weight: 700; }
+.bracket-vs { color: var(--muted); font-size: 11px; font-weight: 700; }
 .room-naming h3, .room-ready h3 { margin: 4px 0 10px; font-family: 'Space Grotesk', sans-serif; font-size: 26px; }
 .room-naming .room-field { margin-bottom: 16px; }
 .room-naming .room-form-actions { margin-bottom: 22px; align-items: center; }
@@ -372,6 +387,8 @@ select.toolbar-select { padding-right: 32px; appearance: none; background-image:
 	.draft-art { height: 110px; }
 	.compare-grid { grid-template-columns: 1fr; }
 	.compare-art { height: 120px; }
+	.bracket-board { gap: 10px; }
+	.bracket-round { min-width: 158px; flex-basis: 158px; padding: 11px; }
 	.topbar { gap: 10px; padding: 0 14px; }
 	.brand span:last-child { display: none; }
 	.topbar-tab { min-height: 38px; padding: 0 11px; font-size: 13px; }
