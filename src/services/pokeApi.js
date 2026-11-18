@@ -29,6 +29,16 @@ export function fetchPokemonDetails(pokemonEntries, signal) {
   )
 }
 
+// Detalhes dos golpes (força, precisão, tipo e classe), um pedido por golpe.
+// Golpes que a API não devolver viram null e são descartados depois.
+export function fetchMoves(moveNames, signal) {
+  return Promise.all(
+    moveNames.map((name) =>
+      requestJSON(`${API_BASE_URL}/move/${encodeURIComponent(name)}`, signal).catch(() => null),
+    ),
+  )
+}
+
 // Nomes de todos os Pokémon de um tipo, em uma única consulta.
 export async function fetchTypeMembers(type, signal) {
   const data = await requestJSON(`${API_BASE_URL}/type/${encodeURIComponent(type)}`, signal)
