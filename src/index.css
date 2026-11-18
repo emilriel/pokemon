@@ -207,6 +207,29 @@ select.toolbar-select { padding-right: 32px; appearance: none; background-image:
 .qr-scanner-error { margin: 0; color: #a04431; font-size: 13px; }
 
 .room-naming, .room-ready { max-width: 520px; margin-top: 24px; }
+
+.draft-screen, .compare-screen { margin-top: 24px; }
+.draft-screen h3, .compare-screen h3 { margin: 4px 0 10px; font-family: 'Space Grotesk', sans-serif; font-size: 26px; }
+.draft-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; max-width: 760px; margin-top: 18px; }
+.draft-option { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 16px; border: 1px solid var(--control-line); border-radius: 10px; background: #fff; text-align: left; cursor: pointer; }
+.draft-option:hover { border-color: var(--forest); }
+.draft-option[data-chosen='true'] { border-color: var(--forest); border-width: 2px; background: var(--leaf); }
+.draft-art { width: 100%; height: 128px; display: grid; place-items: center; }
+.draft-art img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.draft-name { font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
+.draft-stat { color: var(--muted); font-size: 12px; }
+.draft-chosen { color: var(--forest); font-size: 12px; font-weight: 700; }
+
+.compare-grid { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 760px; margin-top: 18px; }
+.compare-side { padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.compare-side h4 { margin: 2px 0 8px; font-family: 'Space Grotesk', sans-serif; font-size: 21px; overflow-wrap: anywhere; }
+.compare-art { height: 150px; display: grid; place-items: center; margin: 10px 0; }
+.compare-art img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.compare-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; margin: 0; }
+.compare-stats div { display: flex; justify-content: space-between; gap: 8px; }
+.compare-stats dt { color: var(--muted); font-size: 13px; }
+.compare-stats dd { margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 700; }
+.compare-grid .battle-versus { background: var(--forest); }
 .room-naming h3, .room-ready h3 { margin: 4px 0 10px; font-family: 'Space Grotesk', sans-serif; font-size: 26px; }
 .room-naming .room-field { margin-bottom: 16px; }
 .room-naming .room-form-actions { margin-bottom: 22px; align-items: center; }
@@ -345,6 +368,10 @@ select.toolbar-select { padding-right: 32px; appearance: none; background-image:
 	.room-lobby { grid-template-columns: 1fr; gap: 24px; }
 	.room-qr { justify-self: stretch; }
 	.room-code-digit { width: 36px; height: 48px; font-size: 21px; }
+	.draft-options { grid-template-columns: 1fr; }
+	.draft-art { height: 110px; }
+	.compare-grid { grid-template-columns: 1fr; }
+	.compare-art { height: 120px; }
 	.topbar { gap: 10px; padding: 0 14px; }
 	.brand span:last-child { display: none; }
 	.topbar-tab { min-height: 38px; padding: 0 11px; font-size: 13px; }

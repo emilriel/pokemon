@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import BattleArena from './BattleArena.jsx'
+import { Comparacao, Sorteio } from './MatchScreens.jsx'
 import QrCode from './QrCode.jsx'
 import QrScanner from './QrScanner.jsx'
 import { MAX_PLAYERS, MIN_PLAYERS, isValidCode, roomLink } from '../services/rooms.js'
@@ -268,7 +270,11 @@ export default function BattleRooms({
   error,
   isBusy,
   isHost,
+  match,
   me,
+  myRoster,
+  onChooseMove,
+  onPick,
   onCreate,
   onJoin,
   onLeave,
@@ -279,6 +285,28 @@ export default function BattleRooms({
   room,
   secondsLeft,
 }) {
+  // Durante o confronto a tela é só a arena, sem o cabeçalho das salas.
+  if (room && (room.status === 'battle' || room.status === 'finished')) {
+    const acabou = room.status === 'finished'
+
+    return (
+      <BattleArena
+        leaveLabel={isHost ? 'Encerrar a sala' : 'Sair da sala'}
+        log={match?.log || []}
+        onChooseMove={(move) => onChooseMove(move.id)}
+        onLeave={onLeave}
+        opponent={match?.rival}
+        opponentLabel={(match?.rivalName || 'RIVAL').toUpperCase()}
+        player={match?.me}
+        round={match?.round || 1}
+        secondsLeft={secondsLeft ?? 0}
+        status={acabou ? 'finished' : match?.myMove ? 'resolving' : 'choosing'}
+        waitingText={match?.myMove ? 'esperando o rival' : 'aguarde'}
+        winner={acabou ? (match?.iWon ? 'player' : match?.winner === 'draw' ? 'draw' : 'opponent') : null}
+      />
+    )
+  }
+
   return (
     <section className="rooms-screen" aria-labelledby="rooms-title">
       <header className="rooms-header">
@@ -329,13 +357,21 @@ export default function BattleRooms({
               </li>
             ))}
           </ul>
-          <p className="room-lobby-hint">
-            O sorteio dos Pokémon e o chaveamento entram na próxima etapa.
-          </p>
-          <button className="secondary-button" type="button" onClick={onLeave}>
-            Encerrar a sala
-          </button>
+          <p className="room-lobby-hint">Sorteando os Pokémon...</p>
         </div>
+      )}
+
+      {room && room.status === 'draft' && (
+        <Sorteio
+          roster={myRoster}
+          picked={room.picks?.[me?.id]}
+          secondsLeft={secondsLeft}
+          onPick={onPick}
+        />
+      )}
+
+      {room && room.status === 'preview' && (
+        <Comparacao match={match} secondsLeft={secondsLeft} />
       )}
     </section>
   )

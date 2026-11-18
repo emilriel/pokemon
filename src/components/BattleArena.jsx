@@ -4,8 +4,8 @@ import { moveClassLabel } from '../services/battle.js'
 import PokemonArt from './PokemonArt.jsx'
 import { formatName, typeLabels } from './PokemonCard.jsx'
 
-function Fighter({ fighter, side }) {
-  const sideLabel = side === 'player' ? 'SEU POKÉMON' : 'RIVAL'
+function Fighter({ fighter, side, sideLabel: given }) {
+  const sideLabel = given || (side === 'player' ? 'SEU POKÉMON' : 'RIVAL')
 
   if (!fighter) {
     return (
@@ -67,15 +67,18 @@ function Fighter({ fighter, side }) {
 
 export default function BattleArena({
   error,
+  leaveLabel = 'Sair da batalha',
   log,
   onChooseMove,
   onLeave,
   onRematch,
   opponent,
+  opponentLabel = 'RIVAL',
   player,
   round,
   secondsLeft,
   status,
+  waitingText,
   winner,
 }) {
   const logRef = useRef(null)
@@ -110,7 +113,7 @@ export default function BattleArena({
           <h2 id="battle-title">{headline}</h2>
         </div>
         <button className="battle-clear" type="button" onClick={onLeave}>
-          Sair da batalha <span aria-hidden="true">×</span>
+          {leaveLabel} <span aria-hidden="true">×</span>
         </button>
       </header>
 
@@ -139,16 +142,18 @@ export default function BattleArena({
       <div className="battle-arena" aria-label="Arena de batalha">
         <Fighter fighter={player} side="player" />
         <span className="battle-versus" aria-hidden="true">VS</span>
-        <Fighter fighter={opponent} side="opponent" />
+        <Fighter fighter={opponent} side="opponent" sideLabel={opponentLabel} />
       </div>
 
       {status === 'finished' ? (
         <div className="battle-end">
-          <button className="load-more-button" type="button" onClick={onRematch}>
-            Lutar de novo
-          </button>
+          {onRematch && (
+            <button className="load-more-button" type="button" onClick={onRematch}>
+              Lutar de novo
+            </button>
+          )}
           <button className="secondary-button" type="button" onClick={onLeave}>
-            Escolher outro Pokémon
+            {leaveLabel}
           </button>
         </div>
       ) : (
@@ -156,7 +161,9 @@ export default function BattleArena({
           <div className="battle-moves">
             <h3 className="battle-moves-title">
               Golpes de {formatName(player.name)}
-              {!isChoosing && <span className="battle-moves-hint"> · aguarde</span>}
+              {!isChoosing && (
+                <span className="battle-moves-hint"> · {waitingText || 'aguarde'}</span>
+              )}
             </h3>
             <div className="move-list">
               {player.moves.map((move) => (

@@ -36,7 +36,7 @@ export default function App() {
   const [view, setView] = useState('pokedex')
   const [battleMode, setBattleMode] = useState(null)
   const battle = useBattle(catalog)
-  const rooms = useRoom()
+  const rooms = useRoom(catalog)
 
   const isFiltering = Boolean(query.trim()) || selectedTypes.length > 0 || evolution !== 'all'
   const formattedMatches = totalMatches === null ? '' : numberFormatter.format(totalMatches)
@@ -142,6 +142,10 @@ export default function App() {
               onCreate={rooms.create}
               onJoin={rooms.join}
               onLeave={() => { rooms.leave(); setBattleMode(null) }}
+              match={rooms.match}
+              myRoster={rooms.myRoster}
+              onChooseMove={rooms.chooseMove}
+              onPick={rooms.pick}
               onSaveMasterName={rooms.saveMasterName}
               onSetReady={rooms.setReady}
               onStartNaming={rooms.startNaming}

@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  chooseMoveForComputer,
-  createFighter,
-  pickMoveCandidates,
-  resolveTurn,
-  toBattleMoves,
-} from '../services/battle.js'
-import { fetchMoves, fetchPokemonDetails } from '../services/pokeApi.js'
+import { chooseMoveForComputer, resolveTurn } from '../services/battle.js'
+import { buildFighter } from '../services/fighters.js'
+import { fetchPokemonDetails } from '../services/pokeApi.js'
 
 // Segundos que cada jogador tem para escolher o golpe da rodada.
 export const TURN_SECONDS = 15
@@ -16,11 +11,6 @@ const RESOLVE_PAUSE = 1800
 
 function isAbortError(error) {
   return error instanceof DOMException && error.name === 'AbortError'
-}
-
-async function buildFighter(pokemon, signal) {
-  const details = await fetchMoves(pickMoveCandidates(pokemon), signal)
-  return createFighter(pokemon, toBattleMoves(details))
 }
 
 export default function useBattle(catalog) {
