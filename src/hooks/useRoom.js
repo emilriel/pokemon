@@ -133,7 +133,12 @@ export default function useRoom(catalog = []) {
 
   useEffect(() => {
     if (!isHost || !code || !room) return
-    const expirou = secondsLeft !== null && secondsLeft <= 0
+
+    // O tempo acabou se o relógio passou do horário guardado na sala. Não dá
+    // para olhar o contador da tela: logo depois de trocar de fase ele ainda
+    // guarda o valor da fase anterior, e um zero atrasado fazia as fases
+    // dispararem em cadeia, uma atrás da outra, sem esperar ninguém.
+    const expirou = Boolean(room.phaseEndsAt) && Date.now() >= room.phaseEndsAt
 
     switch (room.status) {
       case 'naming':
