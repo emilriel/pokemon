@@ -68,6 +68,7 @@ export function Chaveamento({ bracket, players, playerId }) {
           key={`${coluna.round}-${coluna.lado}-${indice}`}
           data-current={coluna.round === bracket.round}
           data-final={coluna.lado === 'final'}
+          data-lado={coluna.lado}
         >
           <h4>{nomeDaFase(coluna.round, bracket.totalRounds)}</h4>
           <ol className="bracket-matches">
@@ -77,6 +78,7 @@ export function Chaveamento({ bracket, players, playerId }) {
                 key={`${coluna.round}-${coluna.lado}-${index}`}
                 data-current={coluna.round === bracket.round && coluna.base + index === bracket.current}
                 data-done={Boolean(pair.winner)}
+                data-final={coluna.lado === 'final'}
               >
                 <Vaga id={pair.a} pair={pair} />
                 <span className="bracket-vs" aria-hidden="true">×</span>

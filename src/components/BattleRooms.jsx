@@ -329,7 +329,11 @@ export default function BattleRooms({
   }
 
   return (
-    <section className="rooms-screen" aria-labelledby="rooms-title">
+    <section
+      className="rooms-screen"
+      aria-labelledby="rooms-title"
+      data-match={['pick', 'preview', 'roundEnd', 'finished'].includes(room?.status)}
+    >
       <header className="rooms-header">
         <p className="eyebrow">MÓDULO 02 · SALAS</p>
         <h2 id="rooms-title">Jogar com amigos</h2>
