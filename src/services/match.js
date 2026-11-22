@@ -24,6 +24,9 @@ export const TEAM_SIZE = 3
 export const PICK_SECONDS = 30
 export const PREVIEW_SECONDS = 15
 export const TURN_SECONDS = 15
+// Teto de rodadas: se ninguém cair, vence quem tiver mais vida. Evita um
+// confronto sem fim quando os dois golpes rendem pouco ou nada.
+export const MAX_ROUNDS = 30
 
 function sorteia(lista, quantidade) {
   const copia = [...lista]
@@ -261,6 +264,19 @@ export function applyTurn({ code, room, players }) {
 
   const log = [...(match.log || []), { round: match.round, events: result.events }]
   const fighters = { [pair.a]: result.player, [pair.b]: result.opponent }
+  const noLimite = match.round >= MAX_ROUNDS
+
+  if (noLimite && !result.winner) {
+    const vencePorVida = result.player.currentHP >= result.opponent.currentHP ? pair.a : pair.b
+    return finishMatch({
+      code,
+      room,
+      pair,
+      fighters,
+      winner: vencePorVida,
+      log: [...log, { round: match.round, events: [{ kind: 'limite', text: 'Deu o tempo da luta. Vence quem está com mais vida.' }] }],
+    })
+  }
 
   if (!result.winner) {
     return update(ref(database, `rooms/${code}`), {

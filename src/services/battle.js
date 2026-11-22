@@ -15,14 +15,19 @@ const MOVE_CANDIDATES = 14
 
 const typeChart = typeChartData.chart
 
-// Golpe de reserva, para o caso raro de um Pokémon sem nenhum golpe de dano.
-const FALLBACK_MOVE = {
-  id: 'investida',
-  name: 'Investida',
-  power: 40,
-  accuracy: 100,
-  type: 'normal',
-  damageClass: 'physical',
+// Golpe de reserva, para quando um Pokémon não tem nenhum golpe de dano na API
+// (acontece com formas alternativas, como as Gmax e as Mega). Ele sai no tipo
+// do próprio Pokémon: assim rende o bônus de tipo igual e raramente cai em uma
+// combinação que não causa dano nenhum.
+function fallbackMove(types) {
+  return {
+    id: 'investida',
+    name: 'Investida',
+    power: 50,
+    accuracy: 100,
+    type: types[0] || 'normal',
+    damageClass: 'physical',
+  }
 }
 
 const moveNames = {
@@ -77,12 +82,13 @@ export function createFighter(pokemon, moves) {
     pokemon.stats.map(({ base_stat: value, stat }) => [stat.name, value]),
   )
   const maxHP = hpAt(stats.hp ?? 1)
+  const types = pokemon.types.map(({ type }) => type.name)
 
   return {
     id: pokemon.id,
     name: pokemon.name,
     label: titleCase(pokemon.name),
-    types: pokemon.types.map(({ type }) => type.name),
+    types,
     image: pokemon.sprites.other['official-artwork'].front_default
       || pokemon.sprites.front_default,
     maxHP,
@@ -92,7 +98,7 @@ export function createFighter(pokemon, moves) {
     specialAttack: statAt(stats['special-attack'] ?? 1),
     specialDefense: statAt(stats['special-defense'] ?? 1),
     speed: statAt(stats.speed ?? 1),
-    moves: moves.length ? moves : [FALLBACK_MOVE],
+    moves: moves.length ? moves : [fallbackMove(types)],
   }
 }
 

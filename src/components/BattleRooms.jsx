@@ -300,6 +300,11 @@ export default function BattleRooms({
   room,
   secondsLeft,
 }) {
+  // Na escolha o confronto ainda não existe, então o nome do rival vem do par.
+  const pair = room?.bracket?.pairs?.[room.bracket.current]
+  const rivalId = pair && (pair.a === me?.id ? pair.b : pair.b === me?.id ? pair.a : null)
+  const rivalName = players.find((player) => player.id === rivalId)?.masterName || 'seu rival'
+
   // Durante a luta a tela é só a arena, sem o cabeçalho das salas.
   if (room && room.status === 'battle') {
     return (
@@ -387,7 +392,7 @@ export default function BattleRooms({
             secondsLeft={secondsLeft}
             onPick={onPick}
             euLuto={isFighting}
-            rivalName={match?.rivalName || 'seu rival'}
+            rivalName={rivalName}
           />
         </>
       )}
