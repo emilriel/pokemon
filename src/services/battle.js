@@ -10,6 +10,12 @@ import typeChartData from '../data/typeChart.json'
 // partida entre duas pessoas, quando a batalha passar a acontecer no servidor.
 
 const LEVEL = 50
+// A fórmula dos jogos deixa a luta curta demais aqui: uma vantagem de quatro
+// vezes derruba de primeira e o confronto acaba em um golpe. Para o torneio
+// render mais rodadas, o dano sai reduzido e nenhum golpe passa de uma fatia
+// da vida do alvo, então são precisos pelo menos três acertos.
+const DAMAGE_SCALE = 0.6
+const MAX_DAMAGE_SHARE = 0.32
 const MOVES_PER_POKEMON = 4
 const MOVE_CANDIDATES = 14
 
@@ -154,7 +160,9 @@ export function calculateDamage(attacker, defender, move, roll = Math.random()) 
   const effectiveness = effectivenessAgainst(move.type, defender.types)
   const variation = 0.85 + roll * 0.15
 
-  const damage = Math.floor(base * stab * effectiveness * variation)
+  const bruto = base * stab * effectiveness * variation * DAMAGE_SCALE
+  const teto = defender.maxHP * MAX_DAMAGE_SHARE
+  const damage = Math.floor(Math.min(bruto, teto))
 
   return {
     damage: effectiveness === 0 ? 0 : Math.max(1, damage),

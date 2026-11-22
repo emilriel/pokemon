@@ -18,24 +18,41 @@ export function Chaveamento({ bracket, players, playerId }) {
   if (!bracket) return null
 
   const nome = (id) => players.find((player) => player.id === id)?.masterName || '—'
-  const fases = [...(bracket.history || []), { round: bracket.round, pairs: bracket.pairs }]
 
-  // As fases que ainda não aconteceram entram como vagas em aberto, para o
-  // quadro mostrar o caminho inteiro até a final desde o começo.
+  // Todas as fases: as já jogadas, a atual, e as que ainda virão como vagas.
+  const fases = [...(bracket.history || []), { round: bracket.round, pairs: bracket.pairs }]
   let quantos = bracket.pairs.length
   for (let round = bracket.round + 1; round <= bracket.totalRounds; round += 1) {
     quantos = Math.ceil(quantos / 2)
     fases.push({ round, pairs: Array.from({ length: quantos }, () => ({ a: null, b: null, winner: null })) })
   }
 
+  // O quadro abre para os lados: metade dos confrontos à esquerda, metade à
+  // direita, e a final no meio, como num chaveamento de campeonato.
+  const colunas = []
+  const anteriores = fases.filter((fase) => fase.round < bracket.totalRounds)
+  const final = fases.find((fase) => fase.round === bracket.totalRounds)
+
+  for (const fase of anteriores) {
+    const corte = Math.ceil(fase.pairs.length / 2)
+    colunas.push({ ...fase, lado: 'esquerda', pairs: fase.pairs.slice(0, corte), base: 0 })
+  }
+  if (final) colunas.push({ ...final, lado: 'final', pairs: final.pairs, base: 0 })
+  for (const fase of [...anteriores].reverse()) {
+    const corte = Math.ceil(fase.pairs.length / 2)
+    colunas.push({ ...fase, lado: 'direita', pairs: fase.pairs.slice(corte), base: corte })
+  }
+
   function Vaga({ id, pair }) {
     if (!id) return <span className="bracket-slot bracket-slot-open">A definir</span>
 
-    const venceu = pair.winner === id
-    const perdeu = pair.winner && pair.winner !== id
-
     return (
-      <span className="bracket-slot" data-winner={venceu} data-out={perdeu} data-me={id === playerId}>
+      <span
+        className="bracket-slot"
+        data-winner={pair.winner === id}
+        data-out={Boolean(pair.winner) && pair.winner !== id}
+        data-me={id === playerId}
+      >
         {nome(id)}
         {id === playerId && <span className="bracket-you"> (você)</span>}
       </span>
@@ -45,15 +62,20 @@ export function Chaveamento({ bracket, players, playerId }) {
   return (
     <div className="bracket-board">
       <h3 className="sr-only">Chaveamento do torneio</h3>
-      {fases.map((fase) => (
-        <section className="bracket-round" key={fase.round} data-current={fase.round === bracket.round}>
-          <h4>{nomeDaFase(fase.round, bracket.totalRounds)}</h4>
+      {colunas.map((coluna, indice) => (
+        <section
+          className="bracket-round"
+          key={`${coluna.round}-${coluna.lado}-${indice}`}
+          data-current={coluna.round === bracket.round}
+          data-final={coluna.lado === 'final'}
+        >
+          <h4>{nomeDaFase(coluna.round, bracket.totalRounds)}</h4>
           <ol className="bracket-matches">
-            {fase.pairs.map((pair, index) => (
+            {coluna.pairs.map((pair, index) => (
               <li
                 className="bracket-match"
-                key={`${fase.round}-${index}`}
-                data-current={fase.round === bracket.round && index === bracket.current}
+                key={`${coluna.round}-${coluna.lado}-${index}`}
+                data-current={coluna.round === bracket.round && coluna.base + index === bracket.current}
                 data-done={Boolean(pair.winner)}
               >
                 <Vaga id={pair.a} pair={pair} />
@@ -154,7 +176,7 @@ export function Comparacao({ match, secondsLeft }) {
   return (
     <div className="compare-screen">
       <p className="eyebrow">O CONFRONTO</p>
-      <h3>{match?.euLuto ? 'Comece a pensar na estratégia' : 'Próximo confronto'}</h3>
+      <h3>{match?.euLuto ? 'Comece a pensar na estratégia' : 'Você está assistindo este confronto'}</h3>
       <p className="room-lobby-hint">
         A luta começa em {secondsLeft !== null ? secondsLeft : '...'} segundos.
       </p>
@@ -170,19 +192,48 @@ export function Comparacao({ match, secondsLeft }) {
 
 export function FimDoConfronto({ match, bracket }) {
   const proximaFase = bracket && bracket.round < bracket.totalRounds
-    ? nomeDaFase(bracket.round + 1, bracket.totalRounds)
-    : 'Final'
+    ? nomeDaFase(bracket.round + 1, bracket.totalRounds).toLowerCase()
+    : 'final'
+
+  const titulo = match?.euLuto
+    ? match.iWon ? `Você passou para a ${proximaFase}!` : 'Você foi eliminado.'
+    : `${match?.winnerName || 'O vencedor'} passou de fase.`
 
   return (
-    <div className="room-ready">
+    <div className="result-screen">
       <p className="eyebrow">RESULTADO</p>
-      <h3>
-        {match?.euLuto
-          ? match.iWon ? `Você passou para a ${proximaFase.toLowerCase()}!` : 'Você foi eliminado.'
-          : `${match?.winnerName || 'O vencedor'} passou de fase.`}
-      </h3>
+      <h3>{titulo}</h3>
+
+      {(match?.me || match?.rival) && (
+        <div className="result-grid">
+          <LadoResultado fighter={match.me} nome={match.meName} />
+          <span className="battle-versus" aria-hidden="true">VS</span>
+          <LadoResultado fighter={match.rival} nome={match.rivalName} />
+        </div>
+      )}
+
       <p className="room-lobby-hint">Preparando o próximo confronto...</p>
     </div>
+  )
+}
+
+function LadoResultado({ fighter, nome }) {
+  if (!fighter) return <div className="result-side" />
+
+  const caiu = fighter.currentHP <= 0
+  const pokemon = formatName(fighter.name)
+
+  return (
+    <article className="result-side" data-down={caiu}>
+      <span className="result-master">{nome}</span>
+      <span className="result-art">
+        <PokemonArt src={fighter.image} alt={`Ilustração de ${pokemon}`} />
+      </span>
+      <span className="result-name">{pokemon}</span>
+      <span className="result-hp">
+        {caiu ? 'Fora de combate' : `${fighter.currentHP} de ${fighter.maxHP} de vida`}
+      </span>
+    </article>
   )
 }
 

@@ -20,13 +20,22 @@ import { playerList } from './rooms.js'
 // A vida não se recupera entre as fases: um Pokémon machucado chega assim na
 // fase seguinte, e por isso cada jogador recebe um time de três.
 
-export const TEAM_SIZE = 3
+// O time tem um Pokémon por fase até a final: três num torneio de oito, dois
+// num de quatro. Assim dá para guardar o mais forte para o fim.
+export function teamSizeFor(totalRounds) {
+  return Math.max(2, totalRounds)
+}
 export const PICK_SECONDS = 30
 export const PREVIEW_SECONDS = 15
+// Lutas entre dois computadores não têm ninguém escolhendo golpe, então o
+// quadro de comparação fica menos tempo na tela.
+export const AUTO_PREVIEW_SECONDS = 8
 export const TURN_SECONDS = 15
 // Teto de rodadas: se ninguém cair, vence quem tiver mais vida. Evita um
 // confronto sem fim quando os dois golpes rendem pouco ou nada.
 export const MAX_ROUNDS = 30
+// Pausa entre um confronto e o próximo, para dar tempo de ver o resultado.
+export const ROUND_END_SECONDS = 7
 
 function sorteia(lista, quantidade) {
   const copia = [...lista]
@@ -62,18 +71,19 @@ export function nomeDaFase(round, totalRounds) {
 // centenas de consultas à API de uma vez.
 export async function startTournament({ code, room, catalog, signal }) {
   const players = playerList(room)
-  const ids = players.flatMap(() => sorteia(catalog, TEAM_SIZE).map((entry) => entry.id))
+  const ordem = embaralha(players.map((player) => player.id))
+  const totalRounds = Math.ceil(Math.log2(Math.max(ordem.length, 2)))
+  const tamanho = teamSizeFor(totalRounds)
+
+  const ids = players.flatMap(() => sorteia(catalog, tamanho).map((entry) => entry.id))
   const detalhes = await fetchPokemonDetails(ids.map((id) => ({ name: String(id) })), signal)
 
   const teams = {}
   players.forEach((player, index) => {
     teams[player.id] = detalhes
-      .slice(index * TEAM_SIZE, (index + 1) * TEAM_SIZE)
+      .slice(index * tamanho, (index + 1) * tamanho)
       .map((pokemon) => createFighter(pokemon, []))
   })
-
-  const ordem = embaralha(players.map((player) => player.id))
-  const totalRounds = Math.ceil(Math.log2(Math.max(ordem.length, 2)))
 
   return update(ref(database, `rooms/${code}`), {
     status: 'pick',
@@ -157,17 +167,14 @@ export async function startMatch({ code, room, players, signal }) {
   const aBot = players.find((item) => item.id === pair.a)?.isBot
   const bBot = players.find((item) => item.id === pair.b)?.isBot
 
-  // Sem ninguém no comando, a luta acontece de uma vez.
+  // Sem ninguém no comando a luta se resolve sozinha, mas ela ainda aparece na
+  // tela: quem já foi eliminado vê o confronto antes e o resultado depois, e
+  // assim acompanha o torneio até a final.
   if (aBot && bBot) {
-    const resultado = simulateMatch(fighters[pair.a], fighters[pair.b])
-    const vencedor = resultado.winner === 'player' ? pair.a : pair.b
-    return finishMatch({
-      code,
-      room,
-      pair,
-      fighters: { [pair.a]: resultado.a, [pair.b]: resultado.b },
-      winner: vencedor,
-      log: [{ round: 1, events: resultado.events.slice(-4) }],
+    return update(ref(database, `rooms/${code}`), {
+      status: 'preview',
+      phaseEndsAt: Date.now() + AUTO_PREVIEW_SECONDS * 1000,
+      match: { fighters, round: 1, moves: null, log: null, winner: null, auto: true },
     })
   }
 
@@ -175,6 +182,26 @@ export async function startMatch({ code, room, players, signal }) {
     status: 'preview',
     phaseEndsAt: Date.now() + PREVIEW_SECONDS * 1000,
     match: { fighters, round: 1, moves: null, log: null, winner: null },
+  })
+}
+
+// Resolve de uma vez um confronto entre dois treinadores do computador, depois
+// de o quadro de comparação ter ficado um tempo na tela.
+export function resolveAuto({ code, room }) {
+  const pair = currentPair(room)
+  const fighters = room?.match?.fighters
+  if (!pair?.a || !pair?.b || !fighters) return null
+
+  const resultado = simulateMatch(fighters[pair.a], fighters[pair.b])
+  const vencedor = resultado.winner === 'player' ? pair.a : pair.b
+
+  return finishMatch({
+    code,
+    room,
+    pair,
+    fighters: { [pair.a]: resultado.a, [pair.b]: resultado.b },
+    winner: vencedor,
+    log: [{ round: 1, events: resultado.events.slice(-4) }],
   })
 }
 
@@ -231,14 +258,14 @@ function finishMatch({ code, room, pair, fighters, winner, log }) {
 
   if (faltamNaFase) {
     mudancas.status = 'roundEnd'
-    mudancas.phaseEndsAt = Date.now() + 4000
+    mudancas.phaseEndsAt = Date.now() + ROUND_END_SECONDS * 1000
   } else if (vencedores.length === 1 && pairs.length === 1) {
     mudancas.status = 'finished'
     mudancas.phaseEndsAt = null
     mudancas.champion = vencedores[0]
   } else {
     mudancas.status = 'roundEnd'
-    mudancas.phaseEndsAt = Date.now() + 4000
+    mudancas.phaseEndsAt = Date.now() + ROUND_END_SECONDS * 1000
   }
 
   return update(ref(database, `rooms/${code}`), mudancas)

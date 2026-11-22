@@ -8,6 +8,7 @@ import {
   nextMatch,
   pairReadyToFight,
   setPick,
+  resolveAuto,
   startBattle,
   startMatch,
   startTournament,
@@ -160,7 +161,8 @@ export default function useRoom(catalog = []) {
 
       case 'preview':
         if (expirou) {
-          advance(`battle:${code}:${room.bracket?.round}:${room.bracket?.current}`, () => startBattle({ code }))
+          advance(`battle:${code}:${room.bracket?.round}:${room.bracket?.current}`,
+            () => (room.match?.auto ? resolveAuto({ code, room }) : startBattle({ code })))
         }
         return
 
