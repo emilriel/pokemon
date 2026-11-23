@@ -296,6 +296,7 @@ export default function BattleRooms({
   onSaveMasterName,
   onSetReady,
   onSkipAuto,
+  onSkipToEnd,
   onStartNaming,
   players,
   room,
@@ -386,6 +387,15 @@ export default function BattleRooms({
           </ul>
           <p className="room-lobby-hint">Sorteando os times...</p>
         </div>
+      )}
+
+      {onSkipToEnd && (
+        <p className="skip-rest">
+          Só restam treinadores do computador.{' '}
+          <button className="link-button" type="button" onClick={onSkipToEnd}>
+            Pular para o resultado final
+          </button>
+        </p>
       )}
 
       {room && room.status === 'pick' && (

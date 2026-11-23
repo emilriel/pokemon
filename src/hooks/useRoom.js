@@ -8,6 +8,8 @@ import {
   nextMatch,
   pairReadyToFight,
   setPick,
+  setTurbo,
+  somenteBots,
   resolveAuto,
   startBattle,
   startMatch,
@@ -186,6 +188,8 @@ export default function useRoom(catalog = []) {
 
   // O mesmo caminho que o relógio usaria, só que agora: passa pela trava de
   // fase, então não dispara duas vezes se o tempo acabar junto com o clique.
+  const soMaquinas = somenteBots(room, players)
+
   const skipAuto = useCallback(() => {
     if (!isHost || !code || !room?.match?.auto || room.status !== 'preview') return
     advance(`battle:${code}:${room.bracket?.round}:${room.bracket?.current}`,
@@ -249,6 +253,9 @@ export default function useRoom(catalog = []) {
     saveMasterName: (name) => setMasterName({ code, playerId, masterName: name }),
     secondsLeft,
     skipAuto: isHost && room?.status === 'preview' && room?.match?.auto ? skipAuto : null,
+    skipToEnd: isHost && soMaquinas && !room?.turbo && room?.status !== 'finished'
+      ? () => setTurbo({ code })
+      : null,
     setReady: (name, ready) => setReady({ code, playerId, masterName: name, ready }),
     startNaming: () => startNaming(code),
   }

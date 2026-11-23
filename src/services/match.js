@@ -37,6 +37,34 @@ export const MAX_ROUNDS = 30
 // Pausa entre um confronto e o próximo, para dar tempo de ver o resultado.
 export const ROUND_END_SECONDS = 7
 
+// Quando só sobrou computador no torneio, o anfitrião pode mandar correr até o
+// fim: as pausas das telas somem e o resto do mata-mata se resolve sozinho.
+export function setTurbo({ code }) {
+  return update(ref(database, `rooms/${code}`), { turbo: true })
+}
+
+// Quem ainda está no torneio: o vencedor, nos confrontos já decididos, e os
+// dois lados nos que faltam. Se nenhum deles é gente, só sobrou computador.
+export function quemSobrou(room) {
+  const pairs = room?.bracket?.pairs || []
+  const ids = []
+  for (const pair of pairs) {
+    if (pair.winner) ids.push(pair.winner)
+    else [pair.a, pair.b].forEach((id) => id && ids.push(id))
+  }
+  return ids
+}
+
+export function somenteBots(room, players) {
+  const vivos = quemSobrou(room)
+  if (!vivos.length) return false
+  return vivos.every((id) => players.find((player) => player.id === id)?.isBot)
+}
+
+function pausa(room, segundos) {
+  return Date.now() + (room?.turbo ? 0 : segundos * 1000)
+}
+
 function sorteia(lista, quantidade) {
   const copia = [...lista]
   const escolhidos = []
@@ -173,7 +201,7 @@ export async function startMatch({ code, room, players, signal }) {
   if (aBot && bBot) {
     return update(ref(database, `rooms/${code}`), {
       status: 'preview',
-      phaseEndsAt: Date.now() + AUTO_PREVIEW_SECONDS * 1000,
+      phaseEndsAt: pausa(room, AUTO_PREVIEW_SECONDS),
       match: { fighters, round: 1, moves: null, log: null, winner: null, auto: true },
     })
   }
@@ -258,14 +286,14 @@ function finishMatch({ code, room, pair, fighters, winner, log }) {
 
   if (faltamNaFase) {
     mudancas.status = 'roundEnd'
-    mudancas.phaseEndsAt = Date.now() + ROUND_END_SECONDS * 1000
+    mudancas.phaseEndsAt = pausa(room, ROUND_END_SECONDS)
   } else if (vencedores.length === 1 && pairs.length === 1) {
     mudancas.status = 'finished'
     mudancas.phaseEndsAt = null
     mudancas.champion = vencedores[0]
   } else {
     mudancas.status = 'roundEnd'
-    mudancas.phaseEndsAt = Date.now() + ROUND_END_SECONDS * 1000
+    mudancas.phaseEndsAt = pausa(room, ROUND_END_SECONDS)
   }
 
   return update(ref(database, `rooms/${code}`), mudancas)

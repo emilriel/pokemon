@@ -147,6 +147,7 @@ export default function App() {
               championName={rooms.championName}
               isFighting={rooms.isFighting}
               onSkipAuto={rooms.skipAuto}
+              onSkipToEnd={rooms.skipToEnd}
               match={rooms.match}
               myPick={rooms.myPick}
               myTeam={rooms.myTeam}

@@ -258,6 +258,10 @@ select.toolbar-select { padding-right: 32px; appearance: none; background-image:
 .compare-stats dd { margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; }
 .compare-grid .battle-versus { background: var(--forest); }
 .compare-skip { margin-top: 18px; }
+.skip-rest { margin: 0 auto 4px; color: var(--muted); font-size: 14px; text-align: center; }
+.link-button { padding: 2px 4px; border: 0; border-radius: 4px; background: none; color: var(--forest); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.link-button:hover { background: var(--leaf); }
+.link-button:focus-visible { outline: 3px solid var(--tomato); outline-offset: 2px; }
 
 
 .bracket-board { display: flex; align-items: stretch; justify-content: center; gap: 26px; min-height: 206px; margin: 16px auto 18px; padding-bottom: 6px; overflow-x: auto; }
