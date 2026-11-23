@@ -4,7 +4,7 @@ import { moveClassLabel } from '../services/battle.js'
 import PokemonArt from './PokemonArt.jsx'
 import { formatName, typeLabels } from './PokemonCard.jsx'
 
-function Fighter({ fighter, side, sideLabel: given }) {
+function Fighter({ effect, fighter, side, sideLabel: given }) {
   const sideLabel = given || (side === 'player' ? 'SEU POKÉMON' : 'RIVAL')
 
   if (!fighter) {
@@ -24,7 +24,13 @@ function Fighter({ fighter, side, sideLabel: given }) {
   const healthLevel = percent <= 25 ? 'baixa' : percent <= 50 ? 'media' : 'alta'
 
   return (
-    <article className={`battle-fighter battle-fighter-${side}`} data-down={fighter.currentHP === 0}>
+    <article
+      className={`battle-fighter battle-fighter-${side}`}
+      data-down={fighter.currentHP === 0}
+      data-attacking={effect?.attacking || undefined}
+      data-hit={effect?.impacts.length > 0 || undefined}
+      data-motion={effect?.motion}
+    >
       <span className="fighter-side-label">{sideLabel}</span>
 
       <div className="fighter-identity">
@@ -43,6 +49,17 @@ function Fighter({ fighter, side, sideLabel: given }) {
 
       <div className="fighter-art">
         <PokemonArt src={fighter.image} alt={`Ilustração de ${name}`} />
+        {effect?.impacts.map((impact) => (
+          <span
+            className={`battle-impact type-badge${impact.moveType ? ` type-${impact.moveType}` : ''}`}
+            data-kind={impact.kind}
+            data-type={impact.moveType}
+            key={impact.key}
+            aria-hidden="true"
+          >
+            {impact.kind === 'hit' ? `-${impact.damage} HP` : 'ERROU!'}
+          </span>
+        ))}
       </div>
 
       <div className="fighter-health">
@@ -84,6 +101,34 @@ export default function BattleArena({
 }) {
   const logRef = useRef(null)
   const lastRound = log[log.length - 1]
+  const actionEvents = lastRound?.events.filter((event) => event.kind === 'hit' || event.kind === 'miss') || []
+  const projectiles = actionEvents.flatMap((event, index) => (
+    event.kind === 'hit'
+      ? [{ key: `${lastRound.round}-${index}`, side: event.side, type: event.moveType }]
+      : []
+  ))
+
+  function effectForSide(side) {
+    if (!lastRound || !actionEvents.length) return null
+
+    const impacts = actionEvents.flatMap((event, index) => {
+      const targetSide = event.side === 'player' ? 'opponent' : 'player'
+      if (targetSide !== side) return []
+
+      return [{
+        key: `${lastRound.round}-${index}`,
+        kind: event.kind,
+        damage: event.damage,
+        moveType: event.moveType,
+      }]
+    })
+
+    return {
+      attacking: actionEvents.some((event) => event.side === side),
+      impacts,
+      motion: lastRound.round % 2 === 0 ? 'b' : 'a',
+    }
+  }
 
   // Mantém a última rodada visível conforme o histórico cresce.
   useEffect(() => {
@@ -141,9 +186,18 @@ export default function BattleArena({
       )}
 
       <div className="battle-arena" aria-label="Arena de batalha">
-        <Fighter fighter={player} side="player" sideLabel={playerLabel} />
+        <Fighter effect={effectForSide('player')} fighter={player} side="player" sideLabel={playerLabel} />
+        {projectiles.map((projectile) => (
+          <span
+            className="battle-projectile"
+            data-side={projectile.side}
+            data-type={projectile.type}
+            key={projectile.key}
+            aria-hidden="true"
+          />
+        ))}
         <span className="battle-versus" aria-hidden="true">VS</span>
-        <Fighter fighter={opponent} side="opponent" sideLabel={opponentLabel} />
+        <Fighter effect={effectForSide('opponent')} fighter={opponent} side="opponent" sideLabel={opponentLabel} />
       </div>
 
       {status === 'finished' ? (

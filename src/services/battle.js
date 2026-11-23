@@ -218,6 +218,7 @@ export function resolveTurn({ player, opponent, playerMove, opponentMove, random
       kind: 'hit',
       side,
       move: move.name,
+      moveType: move.type,
       damage,
       effectiveness,
       text: `${attacker.label} usou ${move.name} e tirou ${damage} de vida.`,
