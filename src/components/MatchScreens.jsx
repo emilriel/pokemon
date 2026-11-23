@@ -19,12 +19,21 @@ export function Chaveamento({ bracket, players, playerId }) {
 
   const nome = (id) => players.find((player) => player.id === id)?.masterName || '—'
 
-  // Todas as fases: as já jogadas, a atual, e as que ainda virão como vagas.
+  // Todas as fases: as já jogadas, a atual, e as que ainda virão.
+  //
+  // Quem já venceu o confronto desta fase aparece na fase seguinte na hora, sem
+  // precisar esperar o torneio virar de fase: o nome sobe para o lado dele do
+  // quadro assim que a luta acaba.
   const fases = [...(bracket.history || []), { round: bracket.round, pairs: bracket.pairs }]
-  let quantos = bracket.pairs.length
+  let anterior = bracket.pairs
   for (let round = bracket.round + 1; round <= bracket.totalRounds; round += 1) {
-    quantos = Math.ceil(quantos / 2)
-    fases.push({ round, pairs: Array.from({ length: quantos }, () => ({ a: null, b: null, winner: null })) })
+    const vencedores = anterior.map((pair) => pair.winner || null)
+    const proximos = []
+    for (let i = 0; i < vencedores.length; i += 2) {
+      proximos.push({ a: vencedores[i] || null, b: vencedores[i + 1] || null, winner: null })
+    }
+    fases.push({ round, pairs: proximos })
+    anterior = proximos
   }
 
   // O quadro abre para os lados: metade dos confrontos à esquerda, metade à
@@ -82,7 +91,7 @@ export function Chaveamento({ bracket, players, playerId }) {
               >
                 <Vaga id={pair.a} pair={pair} />
                 <span className="bracket-vs" aria-hidden="true">×</span>
-                {pair.a && !pair.b
+                {pair.a && !pair.b && coluna.round <= bracket.round
                   ? <span className="bracket-slot bracket-slot-open">passa direto</span>
                   : <Vaga id={pair.b} pair={pair} />}
               </li>
@@ -174,7 +183,7 @@ function Lado({ fighter, titulo }) {
   )
 }
 
-export function Comparacao({ match, secondsLeft }) {
+export function Comparacao({ match, secondsLeft, onSkip }) {
   return (
     <div className="compare-screen">
       <p className="eyebrow">O CONFRONTO</p>
@@ -188,6 +197,12 @@ export function Comparacao({ match, secondsLeft }) {
         <span className="battle-versus" aria-hidden="true">VS</span>
         <Lado fighter={match?.rival} titulo={(match?.rivalName || 'RIVAL').toUpperCase()} />
       </div>
+
+      {onSkip && (
+        <button className="secondary-button compare-skip" type="button" onClick={onSkip}>
+          Adiantar a luta
+        </button>
+      )}
     </div>
   )
 }
@@ -239,11 +254,27 @@ function LadoResultado({ fighter, nome }) {
   )
 }
 
-export function Campeao({ championName, souEu, onLeave, isHost }) {
+export function Campeao({ championName, souEu, fighter, onLeave, isHost }) {
+  const pokemon = fighter ? formatName(fighter.name) : null
+
   return (
-    <div className="room-ready champion-screen">
+    <div className="champion-screen">
+      <span className="champion-medal" aria-hidden="true">1º</span>
       <p className="eyebrow">FIM DO TORNEIO</p>
       <h3>{souEu ? 'Você é o campeão!' : `${championName} é o campeão.`}</h3>
+
+      {fighter && (
+        <div className="champion-card">
+          <span className="champion-art">
+            <PokemonArt src={fighter.image} alt={`Ilustração de ${pokemon}`} />
+          </span>
+          <span className="champion-pokemon">{pokemon}</span>
+          <span className="champion-hp">
+            Terminou com {fighter.currentHP} de {fighter.maxHP} de vida
+          </span>
+        </div>
+      )}
+
       <p className="room-lobby-hint">
         {souEu ? 'Ninguém segurou o seu time.' : 'Quem sabe na próxima.'}
       </p>

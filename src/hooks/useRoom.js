@@ -184,6 +184,14 @@ export default function useRoom(catalog = []) {
     }
   }, [advance, catalog, code, isHost, newRequest, players, room, secondsLeft])
 
+  // O mesmo caminho que o relógio usaria, só que agora: passa pela trava de
+  // fase, então não dispara duas vezes se o tempo acabar junto com o clique.
+  const skipAuto = useCallback(() => {
+    if (!isHost || !code || !room?.match?.auto || room.status !== 'preview') return
+    advance(`battle:${code}:${room.bracket?.round}:${room.bracket?.current}`,
+      () => resolveAuto({ code, room }))
+  }, [advance, code, isHost, room])
+
   async function run(action) {
     setIsBusy(true)
     setError('')
@@ -240,6 +248,7 @@ export default function useRoom(catalog = []) {
     room,
     saveMasterName: (name) => setMasterName({ code, playerId, masterName: name }),
     secondsLeft,
+    skipAuto: isHost && room?.status === 'preview' && room?.match?.auto ? skipAuto : null,
     setReady: (name, ready) => setReady({ code, playerId, masterName: name, ready }),
     startNaming: () => startNaming(code),
   }

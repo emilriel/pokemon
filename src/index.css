@@ -170,6 +170,7 @@ select.toolbar-select { padding-right: 32px; appearance: none; background-image:
 .battle-intro-note { margin: 22px 0 0; color: var(--muted); font-size: 13px; }
 
 .battle-modes, .room-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 22px 0 0; }
+.room-choices { max-width: 720px; margin-inline: auto; }
 .room-choice { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 18px; border: 1px solid var(--control-line); border-radius: 10px; background: #fff; text-align: left; cursor: pointer; }
 .room-choice:hover { border-color: var(--forest); background: var(--leaf); }
 .room-choice:disabled { cursor: not-allowed; opacity: 0.6; }
@@ -179,16 +180,18 @@ select.toolbar-select { padding-right: 32px; appearance: none; background-image:
 
 .rooms-screen { max-width: 900px; margin: 0 auto; padding: 40px 0 72px; }
 .rooms-screen[data-match='true'] { max-width: 1120px; padding: 32px 0 36px; }
+.rooms-header { text-align: center; }
 .rooms-header h2 { margin: 0 0 6px; font-family: 'Space Grotesk', sans-serif; font-size: 36px; line-height: 1.1; }
-.room-form { max-width: 460px; display: grid; gap: 16px; margin-top: 24px; }
+.room-form { max-width: 460px; display: grid; gap: 16px; margin: 24px auto 0; text-align: left; }
 .room-form h3 { margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 21px; }
 .room-field { display: grid; gap: 6px; font-size: 14px; font-weight: 600; }
 .room-field input, .room-field select { min-height: 46px; padding: 0 12px; border: 1px solid var(--control-line); border-radius: 7px; background: #fff; color: var(--ink); font-size: 16px; font-weight: 400; }
 .room-field input:focus-visible, .room-field select:focus-visible { outline: 3px solid var(--tomato); outline-offset: 2px; }
 .room-code-input { font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 700; letter-spacing: 7px; text-align: center; }
 .room-form-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.room-naming .room-form-actions, .room-ready .room-form-actions { justify-content: center; }
 
-.room-lobby { display: grid; grid-template-columns: 1fr 260px; gap: 32px; align-items: start; margin-top: 24px; }
+.room-lobby { max-width: 840px; display: grid; grid-template-columns: 1fr 260px; gap: 32px; align-items: start; margin: 24px auto 0; }
 .room-lobby-main h3 { margin: 4px 0 16px; font-family: 'Space Grotesk', sans-serif; font-size: 28px; }
 .room-code-display { display: flex; gap: 7px; margin: 0 0 12px; }
 .room-code-digit { width: 42px; height: 54px; display: grid; place-items: center; border: 1px solid var(--forest); border-radius: 7px; background: var(--leaf); font-family: 'Space Grotesk', sans-serif; font-size: 25px; font-weight: 700; }
@@ -207,7 +210,17 @@ select.toolbar-select { padding-right: 32px; appearance: none; background-image:
 .qr-scanner-view { width: 100%; max-width: 320px; overflow: hidden; border: 1px solid var(--control-line); border-radius: 9px; background: #000; }
 .qr-scanner-error { margin: 0; color: #a04431; font-size: 13px; }
 
-.room-naming, .room-ready { max-width: 520px; margin-top: 24px; }
+.room-naming, .room-ready { max-width: 520px; margin: 24px auto 0; }
+
+.champion-screen { max-width: 480px; margin: 18px auto 0; text-align: center; }
+.champion-medal { width: 56px; height: 56px; display: grid; place-items: center; margin: 0 auto 12px; border: 2px solid #f4cb4f; border-radius: 50%; background: #fffaea; color: #8a6d12; font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; }
+.champion-screen h3 { margin: 4px 0 16px; font-family: 'Space Grotesk', sans-serif; font-size: 26px; }
+.champion-card { display: grid; justify-items: center; gap: 5px; margin-bottom: 18px; padding: 16px; border: 2px solid #f4cb4f; border-radius: 10px; background: #fffaea; }
+.champion-art { height: 150px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.champion-art img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.champion-pokemon { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; overflow-wrap: anywhere; }
+.champion-hp { color: #6b5a22; font-size: 13px; }
+.champion-screen .room-lobby-hint { margin-bottom: 18px; }
 
 .result-screen { max-width: 700px; margin: 20px auto 0; text-align: center; }
 .result-screen h3 { margin: 4px 0 14px; font-family: 'Space Grotesk', sans-serif; font-size: 22px; }
@@ -244,8 +257,9 @@ select.toolbar-select { padding-right: 32px; appearance: none; background-image:
 .compare-stats dt { color: var(--muted); font-size: 14px; }
 .compare-stats dd { margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; }
 .compare-grid .battle-versus { background: var(--forest); }
+.compare-skip { margin-top: 18px; }
 
-.rooms-screen[data-match='true'] .rooms-header { text-align: center; }
+
 .bracket-board { display: flex; align-items: stretch; justify-content: center; gap: 26px; min-height: 206px; margin: 16px auto 18px; padding-bottom: 6px; overflow-x: auto; }
 .bracket-round { display: flex; flex-direction: column; min-width: 150px; flex: 0 0 172px; }
 
@@ -265,6 +279,9 @@ select.toolbar-select { padding-right: 32px; appearance: none; background-image:
 .bracket-round[data-lado='esquerda'] .bracket-match::after { left: 100%; }
 .bracket-round[data-lado='direita'] .bracket-match::before { right: 100%; }
 .bracket-match[data-current='true'] { border-color: var(--tomato); border-width: 2px; padding: 8px 9px; background: #fff; }
+/* Confronto já decidido não é mais "o de agora", mesmo sendo o último. */
+.bracket-match[data-current='true'][data-done='true'] { border-color: var(--line); border-width: 1px; padding: 9px 10px; background: #fafbf9; }
+.bracket-match[data-current='true'][data-done='true'][data-final='true'] { border-color: #f4cb4f; border-width: 2px; padding: 8px 9px; background: #fffaea; }
 .bracket-slot { font-size: 13px; overflow-wrap: anywhere; }
 .bracket-slot[data-winner='true'] { color: var(--forest); font-weight: 700; }
 .bracket-slot[data-out='true'] { color: var(--muted); text-decoration: line-through; }

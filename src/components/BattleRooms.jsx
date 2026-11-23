@@ -295,6 +295,7 @@ export default function BattleRooms({
   onLeave,
   onSaveMasterName,
   onSetReady,
+  onSkipAuto,
   onStartNaming,
   players,
   room,
@@ -402,7 +403,7 @@ export default function BattleRooms({
       )}
 
       {room && room.status === 'preview' && (
-        <Comparacao match={match} secondsLeft={secondsLeft} />
+        <Comparacao match={match} secondsLeft={secondsLeft} onSkip={onSkipAuto} />
       )}
 
       {room && room.status === 'roundEnd' && (
@@ -417,6 +418,7 @@ export default function BattleRooms({
           <Chaveamento bracket={bracket} players={players} playerId={me?.id} />
           <Campeao
             championName={championName}
+            fighter={room?.match?.fighters?.[champion] || null}
             souEu={champion === me?.id}
             isHost={isHost}
             onLeave={onLeave}
