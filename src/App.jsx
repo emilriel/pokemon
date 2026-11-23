@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
-import BattlePreview from './components/BattlePreview.jsx'
+import { useEffect, useState } from 'react'
+import BattleArena from './components/BattleArena.jsx'
+import BattleRooms from './components/BattleRooms.jsx'
+import CatalogToolbar from './components/CatalogToolbar.jsx'
 import PokemonDialog from './components/PokemonDialog.jsx'
-import PokemonFilters from './components/PokemonFilters.jsx'
 import PokemonGrid from './components/PokemonGrid.jsx'
+import useBattle from './hooks/useBattle.js'
+import useRoom from './hooks/useRoom.js'
 import usePokedex, { MAX_SELECTED_TYPES } from './hooks/usePokedex.js'
-import { fetchPokemonDetails } from './services/pokeApi.js'
 
 const numberFormatter = new Intl.NumberFormat('pt-BR')
 
@@ -31,13 +33,10 @@ export default function App() {
   } = usePokedex()
   const [selectedPokemon, setSelectedPokemon] = useState(null)
   const [pendingFocusId, setPendingFocusId] = useState(null)
-  const [battlePlayer, setBattlePlayer] = useState(null)
-  const [battleOpponent, setBattleOpponent] = useState(null)
-  const [isLoadingOpponent, setIsLoadingOpponent] = useState(false)
-  const [battleError, setBattleError] = useState('')
-  const battleRequest = useRef(null)
-  const battleRequestId = useRef(0)
-  const battlePreviewRef = useRef(null)
+  const [view, setView] = useState('pokedex')
+  const [battleMode, setBattleMode] = useState(null)
+  const battle = useBattle(catalog)
+  const rooms = useRoom(catalog)
 
   const isFiltering = Boolean(query.trim()) || selectedTypes.length > 0 || evolution !== 'all'
   const formattedMatches = totalMatches === null ? '' : numberFormatter.format(totalMatches)
@@ -54,10 +53,10 @@ export default function App() {
           : `${numberFormatter.format(pokemon.length)} Pokémon exibidos.`
 
   const countMessage = !catalog.length
-    ? 'Conectando ao catálogo'
+    ? 'Conectando...'
     : isFiltering && totalMatches !== null
       ? `${formattedMatches} ${resultsLabel}`
-      : `${numberFormatter.format(catalog.length)} para descobrir`
+      : `${numberFormatter.format(catalog.length)} Pokémon`
 
   // Depois de "Carregar mais", leva o foco ao primeiro cartão novo para quem navega por teclado.
   useEffect(() => {
@@ -66,63 +65,41 @@ export default function App() {
     setPendingFocusId(null)
   }, [pendingFocusId, pokemon])
 
-  useEffect(() => () => battleRequest.current?.abort(), [])
-
+  // Quem abre o site pelo QR Code de uma sala já entra por ela.
   useEffect(() => {
-    if (!battlePlayer) return
-    battlePreviewRef.current?.focus({ preventScroll: true })
-    battlePreviewRef.current?.scrollIntoView({ block: 'start' })
-  }, [battlePlayer])
+    if (rooms.room || rooms.code) {
+      setView('battle')
+      setBattleMode('amigos')
+    }
+  }, [rooms.code, rooms.room])
 
   async function handleLoadMore() {
     const firstNewPokemon = await loadMore()
     if (firstNewPokemon) setPendingFocusId(firstNewPokemon.id)
   }
 
-  async function handleChooseForBattle(player) {
-    battleRequest.current?.abort()
-    const controller = new AbortController()
-    battleRequest.current = controller
-    const currentRequestId = ++battleRequestId.current
-    const possibleOpponents = catalog.filter((entry) => entry.id !== player.id)
-    const opponentEntry = possibleOpponents[Math.floor(Math.random() * possibleOpponents.length)]
-
-    setBattlePlayer(player)
-    setBattleOpponent(null)
-    setBattleError('')
-    setIsLoadingOpponent(Boolean(opponentEntry))
+  function handleChooseForBattle(chosen) {
     setSelectedPokemon(null)
-
-    if (!opponentEntry) {
-      setBattleError('Não foi possível encontrar um rival no catálogo.')
-      return
-    }
-
-    try {
-      const [opponent] = await fetchPokemonDetails([opponentEntry], controller.signal)
-      if (battleRequestId.current === currentRequestId) setBattleOpponent(opponent)
-    } catch {
-      if (battleRequestId.current === currentRequestId) {
-        setBattleError('Não foi possível carregar o rival. Tente novamente.')
-      }
-    } finally {
-      if (battleRequestId.current === currentRequestId) setIsLoadingOpponent(false)
-    }
+    setView('battle')
+    setBattleMode('computador')
+    window.scrollTo({ top: 0 })
+    battle.start(chosen)
   }
 
-  function clearBattlePreview() {
-    battleRequest.current?.abort()
-    battleRequestId.current += 1
-    setBattlePlayer(null)
-    setBattleOpponent(null)
-    setIsLoadingOpponent(false)
-    setBattleError('')
+  function handleRandomFighter() {
+    const entry = catalog[Math.floor(Math.random() * catalog.length)]
+    if (entry) battle.start(entry)
+  }
+
+  function leaveBattle() {
+    battle.leave()
+    setBattleMode(null)
   }
 
   return (
     <div className="app-shell">
-      <a className="skip-link" href="#catalogo">
-        Ir para o catálogo
+      <a className="skip-link" href="#conteudo">
+        Ir para o conteúdo
       </a>
 
       <header className="topbar">
@@ -130,145 +107,197 @@ export default function App() {
           <span className="brand-mark" aria-hidden="true">P</span>
           <span>Pokédex</span>
         </a>
-        <span className="topbar-note">
-          <span className="connection-dot" aria-hidden="true" />
-          Módulo 01 <span className="topbar-divider" aria-hidden="true">/</span> Catálogo
-        </span>
+
+        <nav className="topbar-nav" aria-label="Seções">
+          <button
+            className="topbar-tab"
+            type="button"
+            aria-current={view === 'pokedex' ? 'page' : undefined}
+            onClick={() => setView('pokedex')}
+          >
+            Pokédex
+          </button>
+          <button
+            className="topbar-tab"
+            type="button"
+            aria-current={view === 'battle' ? 'page' : undefined}
+            onClick={() => setView('battle')}
+          >
+            Modo batalha
+          </button>
+        </nav>
       </header>
 
       <main id="inicio" className="page-content">
-        <section className="intro" aria-labelledby="page-title">
-          <div className="intro-copy">
-            <p className="eyebrow">SEU GUIA DE CAMPO POKÉMON</p>
-            <h1 id="page-title">
-              Todos eles,
-              <br />
-              <span>em um só lugar.</span>
-            </h1>
-            <p className="intro-description">
-              Explore espécies, descubra seus tipos e encontre seu próximo favorito.
-            </p>
-          </div>
-          <div className="intro-stamp">
-            <span className="stamp-number">
-              {catalog.length ? numberFormatter.format(catalog.length) : '...'}
-            </span>
-            <span className="stamp-label">Pokémon<br />no catálogo</span>
-            <span className="stamp-source">DADOS POKEAPI</span>
-          </div>
-        </section>
+        <div id="conteudo" tabIndex={-1} className="sr-only" />
 
-        {battlePlayer && (
-          <BattlePreview
-            sectionRef={battlePreviewRef}
-            player={battlePlayer}
-            opponent={battleOpponent}
-            isLoadingOpponent={isLoadingOpponent}
-            error={battleError}
-            onRetry={() => handleChooseForBattle(battlePlayer)}
-            onClear={clearBattlePreview}
-          />
-        )}
-
-        <section id="catalogo" className="catalog-section" aria-labelledby="catalog-title">
-          <div className="catalog-heading">
-            <div>
-              <p className="eyebrow">A COLEÇÃO</p>
-              <h2 id="catalog-title">Pokémon</h2>
-            </div>
-            <p className="catalog-count">{countMessage}</p>
-          </div>
-
-          <form className="search-form" role="search" onSubmit={(event) => event.preventDefault()}>
-            <label className="search-label" htmlFor="pokemon-search">
-              Pesquisar Pokémon por nome ou número
-            </label>
-            <span className="search-icon" aria-hidden="true">⌕</span>
-            <input
-              id="pokemon-search"
-              className="search-input"
-              type="search"
-              placeholder="Ex.: pikachu ou 25"
-              autoComplete="off"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              aria-controls="pokemon-grid"
+        {view === 'battle' ? (
+          battleMode === 'amigos' ? (
+            <BattleRooms
+              code={rooms.code}
+              error={rooms.error}
+              isBusy={rooms.isBusy}
+              isHost={rooms.isHost}
+              me={rooms.me}
+              onCreate={rooms.create}
+              onJoin={rooms.join}
+              onLeave={() => { rooms.leave(); setBattleMode(null) }}
+              bracket={rooms.bracket}
+              champion={rooms.champion}
+              championName={rooms.championName}
+              isFighting={rooms.isFighting}
+              onSkipAuto={rooms.skipAuto}
+              onSkipToEnd={rooms.skipToEnd}
+              match={rooms.match}
+              myPick={rooms.myPick}
+              myTeam={rooms.myTeam}
+              onChooseMove={rooms.chooseMove}
+              onFillWithBots={rooms.fillWithBots}
+              onPick={rooms.pick}
+              onSaveMasterName={rooms.saveMasterName}
+              onSetReady={rooms.setReady}
+              onStartNaming={rooms.startNaming}
+              players={rooms.players}
+              room={rooms.room}
+              secondsLeft={rooms.secondsLeft}
             />
-            {query && (
-              <button className="clear-search" type="button" onClick={() => setQuery('')}>
-                Limpar
-              </button>
-            )}
-          </form>
+          ) : battle.status === 'idle' ? (
+            <section className="battle-intro" aria-labelledby="battle-intro-title">
+              <p className="eyebrow">MÓDULO 02 · BATALHA</p>
+              <h2 id="battle-intro-title">Modo batalha</h2>
+              <p className="battle-intro-text">
+                A luta acontece por rodadas: você escolhe o golpe, o tipo conta, e vence quem
+                zerar a vida do outro.
+              </p>
 
-          <PokemonFilters
-            evolution={evolution}
-            maxTypes={MAX_SELECTED_TYPES}
-            onClear={clearFilters}
-            onEvolutionChange={setEvolution}
-            onTypeToggle={toggleType}
-            selectedTypes={selectedTypes}
-          />
-
-          <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-            {statusMessage}
-          </p>
-
-          {error ? (
-            <div className="feedback-panel" role="alert">
-              <span className="feedback-symbol" aria-hidden="true">!</span>
-              <h3>O catálogo não respondeu.</h3>
-              <p>{error}</p>
-              <button className="secondary-button" type="button" onClick={retry}>
-                Tentar novamente
-              </button>
-            </div>
-          ) : isLoading || (isSearching && !pokemon.length) ? (
-            <div className="loading-grid" aria-hidden="true">
-              {Array.from({ length: 8 }, (_, index) => (
-                <div className="skeleton-card" key={index}>
-                  <span className="skeleton-art" />
-                  <span className="skeleton-line" />
-                  <span className="skeleton-line skeleton-line-short" />
-                </div>
-              ))}
-            </div>
-          ) : pokemon.length ? (
-            <>
-              <PokemonGrid
-                pokemon={pokemon}
-                onSelect={setSelectedPokemon}
-                isBusy={isSearching || isLoadingMore}
-              />
-              {hasMore && (
-                <div className="load-more-wrap">
-                  <button
-                    className="load-more-button"
-                    type="button"
-                    onClick={handleLoadMore}
-                    aria-disabled={isLoadingMore || isSearching}
-                  >
-                    {isLoadingMore ? 'Carregando...' : 'Carregar mais Pokémon'}
-                    {!isLoadingMore && <span aria-hidden="true"> ↓</span>}
-                  </button>
+              <div className="battle-modes">
+                <button className="room-choice" type="button" onClick={() => setBattleMode('amigos')}>
+                  <span className="room-choice-title">Jogar com amigos</span>
+                  <span className="room-choice-text">
+                    Crie uma sala e chame a galera pelo código ou pelo QR Code.
+                  </span>
+                </button>
+                <button
+                  className="room-choice"
+                  type="button"
+                  disabled={!catalog.length}
+                  onClick={handleRandomFighter}
+                >
+                  <span className="room-choice-title">Treinar contra o computador</span>
+                  <span className="room-choice-text">
+                    {catalog.length
+                      ? 'Sorteamos um Pokémon para você e um rival, e a luta começa.'
+                      : 'Carregando o catálogo...'}
+                  </span>
+                </button>
+              </div>
+              {battle.error && (
+                <div className="feedback-panel" role="alert">
+                  <span className="feedback-symbol" aria-hidden="true">!</span>
+                  <h3>A batalha não começou.</h3>
+                  <p>{battle.error}</p>
                 </div>
               )}
-            </>
-          ) : (
-            <div className="feedback-panel empty-panel">
-              <span className="feedback-symbol" aria-hidden="true">?</span>
-              <h3>Nenhum Pokémon encontrado.</h3>
-              <p>
-                {selectedTypes.length > 0 || evolution !== 'all'
-                  ? 'Nenhum Pokémon combina com a busca e os filtros escolhidos.'
-                  : 'Confira a escrita ou tente outro nome ou número.'}
+              <div className="battle-intro-actions">
+                <button className="secondary-button" type="button" onClick={() => setView('pokedex')}>
+                  Escolher um Pokémon na Pokédex
+                </button>
+              </div>
+              <p className="battle-intro-note">
+                O sorteio dos Pokémon e o chaveamento do torneio entram na próxima etapa.
               </p>
-              <button className="secondary-button" type="button" onClick={clearAll}>
-                Ver catálogo completo
-              </button>
-            </div>
-          )}
-        </section>
+            </section>
+          ) : (
+            <BattleArena
+              error={battle.error}
+              log={battle.log}
+              onChooseMove={battle.chooseMove}
+              onLeave={leaveBattle}
+              onRematch={battle.rematch}
+              opponent={battle.opponent}
+              player={battle.player}
+              round={battle.round}
+              secondsLeft={battle.secondsLeft}
+              status={battle.status}
+              winner={battle.winner}
+            />
+          )
+        ) : (
+          <section id="catalogo" className="catalog-section" aria-labelledby="catalog-title">
+            <h2 id="catalog-title" className="sr-only">Catálogo de Pokémon</h2>
+
+            <CatalogToolbar
+              count={countMessage}
+              evolution={evolution}
+              maxTypes={MAX_SELECTED_TYPES}
+              onClearFilters={clearFilters}
+              onEvolutionChange={setEvolution}
+              onQueryChange={setQuery}
+              onTypeToggle={toggleType}
+              query={query}
+              selectedTypes={selectedTypes}
+            />
+
+            <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+              {statusMessage}
+            </p>
+
+            {error ? (
+              <div className="feedback-panel" role="alert">
+                <span className="feedback-symbol" aria-hidden="true">!</span>
+                <h3>O catálogo não respondeu.</h3>
+                <p>{error}</p>
+                <button className="secondary-button" type="button" onClick={retry}>
+                  Tentar novamente
+                </button>
+              </div>
+            ) : isLoading || (isSearching && !pokemon.length) ? (
+              <div className="loading-grid" aria-hidden="true">
+                {Array.from({ length: 10 }, (_, index) => (
+                  <div className="skeleton-card" key={index}>
+                    <span className="skeleton-art" />
+                    <span className="skeleton-line" />
+                    <span className="skeleton-line skeleton-line-short" />
+                  </div>
+                ))}
+              </div>
+            ) : pokemon.length ? (
+              <>
+                <PokemonGrid
+                  pokemon={pokemon}
+                  onSelect={setSelectedPokemon}
+                  isBusy={isSearching || isLoadingMore}
+                />
+                {hasMore && (
+                  <div className="load-more-wrap">
+                    <button
+                      className="load-more-button"
+                      type="button"
+                      onClick={handleLoadMore}
+                      aria-disabled={isLoadingMore || isSearching}
+                    >
+                      {isLoadingMore ? 'Carregando...' : 'Carregar mais Pokémon'}
+                      {!isLoadingMore && <span aria-hidden="true"> ↓</span>}
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="feedback-panel empty-panel">
+                <span className="feedback-symbol" aria-hidden="true">?</span>
+                <h3>Nenhum Pokémon encontrado.</h3>
+                <p>
+                  {selectedTypes.length > 0 || evolution !== 'all'
+                    ? 'Nenhum Pokémon combina com a busca e os filtros escolhidos.'
+                    : 'Confira a escrita ou tente outro nome ou número.'}
+                </p>
+                <button className="secondary-button" type="button" onClick={clearAll}>
+                  Ver catálogo completo
+                </button>
+              </div>
+            )}
+          </section>
+        )}
       </main>
 
       <footer className="page-footer">

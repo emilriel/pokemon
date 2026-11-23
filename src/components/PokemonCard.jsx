@@ -1,3 +1,4 @@
+import PokemonArt from './PokemonArt.jsx'
 const typeLabels = {
   bug: 'Inseto',
   dark: 'Sombrio',
@@ -42,11 +43,7 @@ export default function PokemonCard({ pokemon, onSelect }) {
     >
       <span className="card-number">#{String(pokemon.id).padStart(4, '0')}</span>
       <span className="card-art">
-        {image ? (
-          <img src={image} alt={`Ilustração de ${formatName(pokemon.name)}`} loading="lazy" />
-        ) : (
-          <span className="image-fallback" aria-hidden="true">?</span>
-        )}
+        <PokemonArt src={image} alt={`Ilustração de ${formatName(pokemon.name)}`} lazy />
       </span>
       <span className="card-copy">
         <span className="card-name">{formatName(pokemon.name)}</span>

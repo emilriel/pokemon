@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import PokemonArt from './PokemonArt.jsx'
 import { getEvolutionFamily } from '../services/evolution.js'
 import { formatName, typeLabels } from './PokemonCard.jsx'
 
@@ -52,7 +53,7 @@ export default function PokemonDialog({ pokemon, onClose, onChoose }) {
 
         <div className="dialog-overview">
           <div className="dialog-art">
-            {image && <img src={image} alt={`Ilustração de ${formatName(pokemon.name)}`} />}
+            <PokemonArt src={image} alt={`Ilustração de ${formatName(pokemon.name)}`} />
           </div>
           <div className="dialog-heading">
             <p className="eyebrow">FICHA POKÉMON</p>
