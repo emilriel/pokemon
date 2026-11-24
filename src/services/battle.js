@@ -18,6 +18,8 @@ const DAMAGE_SCALE = 0.6
 const MAX_DAMAGE_SHARE = 0.32
 const MOVES_PER_POKEMON = 4
 const MOVE_CANDIDATES = 14
+export const ATTACK_ACTION_INTERVAL_MS = 1100
+export const ATTACK_IMPACT_DELAY_MS = 620
 
 const typeChart = typeChartData.chart
 
@@ -207,11 +209,18 @@ export function resolveTurn({ player, opponent, playerMove, opponentMove, random
     if (attacker.currentHP <= 0 || defender.currentHP <= 0) continue
 
     if (!moveHits(move, random())) {
-      events.push({ kind: 'miss', side, text: `${attacker.label} usou ${move.name}, mas errou.` })
+      events.push({
+        kind: 'miss',
+        side,
+        move: move.name,
+        moveType: move.type,
+        text: `${attacker.label} usou ${move.name}, mas errou.`,
+      })
       continue
     }
 
     const { damage, effectiveness } = calculateDamage(attacker, defender, move, random())
+    const targetHPBefore = defender.currentHP
     defender.currentHP = Math.max(0, defender.currentHP - damage)
 
     events.push({
@@ -221,6 +230,8 @@ export function resolveTurn({ player, opponent, playerMove, opponentMove, random
       moveType: move.type,
       damage,
       effectiveness,
+      targetHPBefore,
+      targetHPAfter: defender.currentHP,
       text: `${attacker.label} usou ${move.name} e tirou ${damage} de vida.`,
       note: describeEffectiveness(effectiveness),
     })

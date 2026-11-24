@@ -1,5 +1,12 @@
 import { ref, update } from 'firebase/database'
-import { chooseMoveForComputer, createFighter, resolveTurn, simulateMatch } from './battle.js'
+import { KANTO_STARTERS } from '../data/kantoStarters.js'
+import {
+  ATTACK_ACTION_INTERVAL_MS,
+  chooseMoveForComputer,
+  createFighter,
+  resolveTurn,
+  simulateMatch,
+} from './battle.js'
 import { buildFighterById } from './fighters.js'
 import { database } from './firebase.js'
 import { fetchPokemonDetails } from './pokeApi.js'
@@ -17,11 +24,11 @@ import { playerList } from './rooms.js'
 // Para impedir de verdade, o cálculo teria de rodar num servidor.
 //
 // Os confrontos acontecem um de cada vez, e quem não está lutando assiste.
-// A vida não se recupera entre as fases: um Pokémon machucado chega assim na
-// fase seguinte, e por isso cada jogador recebe um time de três.
+// Cada duelo continua 1x1, e os Pokémon escolhidos levam a vida restante para
+// as fases seguintes.
 
-// O time tem um Pokémon por fase até a final: três num torneio de oito, dois
-// num de quatro. Assim dá para guardar o mais forte para o fim.
+// O sorteio mantém uma opção aleatória por fase até a final: três num torneio
+// de oito, dois num de quatro. Os três iniciais são opções extras.
 export function teamSizeFor(totalRounds) {
   return Math.max(2, totalRounds)
 }
@@ -31,6 +38,7 @@ export const PREVIEW_SECONDS = 15
 // quadro de comparação fica menos tempo na tela.
 export const AUTO_PREVIEW_SECONDS = 8
 export const TURN_SECONDS = 15
+const FINAL_PRESENTATION_BUFFER_MS = 350
 // Teto de rodadas: se ninguém cair, vence quem tiver mais vida. Evita um
 // confronto sem fim quando os dois golpes rendem pouco ou nada.
 export const MAX_ROUNDS = 30
@@ -94,22 +102,28 @@ export function nomeDaFase(round, totalRounds) {
   return `${round}ª fase`
 }
 
-// Monta os times: três Pokémon por jogador, só com atributos. Os golpes entram
-// depois, quando o Pokémon é escolhido para um confronto, para não pedir
-// centenas de consultas à API de uma vez.
+// Monta as opções de cada treinador: o sorteio original mais os três iniciais
+// de Kanto. Os golpes entram depois, quando um Pokémon é escolhido para lutar.
 export async function startTournament({ code, room, catalog, signal }) {
   const players = playerList(room)
   const ordem = embaralha(players.map((player) => player.id))
   const totalRounds = Math.ceil(Math.log2(Math.max(ordem.length, 2)))
   const tamanho = teamSizeFor(totalRounds)
 
-  const ids = players.flatMap(() => sorteia(catalog, tamanho).map((entry) => entry.id))
-  const detalhes = await fetchPokemonDetails(ids.map((id) => ({ name: String(id) })), signal)
+  const starterIds = KANTO_STARTERS.map(({ id }) => id)
+  const randomPool = catalog.filter((entry) => !starterIds.includes(entry.id))
+  const randomChoices = players.flatMap(() => sorteia(randomPool, tamanho))
+  const detalhes = await fetchPokemonDetails([
+    ...randomChoices.map(({ id }) => ({ name: String(id) })),
+    ...KANTO_STARTERS.map(({ name }) => ({ name })),
+  ], signal)
+  const pokemonAleatorios = detalhes.slice(0, randomChoices.length)
+  const pokemonIniciais = detalhes.slice(randomChoices.length)
 
   const teams = {}
   players.forEach((player, index) => {
-    teams[player.id] = detalhes
-      .slice(index * tamanho, (index + 1) * tamanho)
+    const aleatorios = pokemonAleatorios.slice(index * tamanho, (index + 1) * tamanho)
+    teams[player.id] = [...aleatorios, ...pokemonIniciais]
       .map((pokemon) => createFighter(pokemon, []))
   })
 
@@ -271,6 +285,7 @@ function finishMatch({ code, room, pair, fighters, winner, log }) {
     'match/winner': winner,
     'match/log': log,
     'match/moves': null,
+    'match/pendingFinish': null,
     'bracket/pairs': pairs,
   }
 
@@ -299,6 +314,21 @@ function finishMatch({ code, room, pair, fighters, winner, log }) {
   return update(ref(database, `rooms/${code}`), mudancas)
 }
 
+export function finishPendingMatch({ code, room }) {
+  const pending = room?.match?.pendingFinish
+  const pair = currentPair(room)
+  if (!pending || !pair) return Promise.resolve()
+
+  return finishMatch({
+    code,
+    room,
+    pair,
+    fighters: room.match.fighters,
+    winner: pending.winner,
+    log: room.match.log || [],
+  })
+}
+
 // Resolve uma rodada do confronto atual.
 export function applyTurn({ code, room, players }) {
   const pair = currentPair(room)
@@ -317,26 +347,26 @@ export function applyTurn({ code, room, players }) {
     opponentMove: bBot ? chooseMoveForComputer(fighterB, fighterA) : achaGolpe(fighterB, match.moves?.[pair.b]),
   })
 
-  const log = [...(match.log || []), { round: match.round, events: result.events }]
+  let log = [...(match.log || []), { round: match.round, events: result.events }]
   const fighters = { [pair.a]: result.player, [pair.b]: result.opponent }
+  const actionCount = result.events.filter((event) => event.kind === 'hit' || event.kind === 'miss').length
+  const presentationMs = actionCount * ATTACK_ACTION_INTERVAL_MS
   const noLimite = match.round >= MAX_ROUNDS
+  let winner = result.winner === 'player' ? pair.a : result.winner === 'opponent' ? pair.b : result.winner ? pair.a : null
 
-  if (noLimite && !result.winner) {
-    const vencePorVida = result.player.currentHP >= result.opponent.currentHP ? pair.a : pair.b
-    return finishMatch({
-      code,
-      room,
-      pair,
-      fighters,
-      winner: vencePorVida,
-      log: [...log, { round: match.round, events: [{ kind: 'limite', text: 'Deu o tempo da luta. Vence quem está com mais vida.' }] }],
-    })
+  if (noLimite && !winner) {
+    winner = result.player.currentHP >= result.opponent.currentHP ? pair.a : pair.b
+    log = log.map((entry, index) => (
+      index === log.length - 1
+        ? { ...entry, events: [...entry.events, { kind: 'limite', text: 'Deu o tempo da luta. Vence quem está com mais vida.' }] }
+        : entry
+    ))
   }
 
-  if (!result.winner) {
+  if (!winner) {
     return update(ref(database, `rooms/${code}`), {
       status: 'battle',
-      phaseEndsAt: Date.now() + TURN_SECONDS * 1000,
+      phaseEndsAt: Date.now() + presentationMs + TURN_SECONDS * 1000,
       'match/fighters': fighters,
       'match/round': match.round + 1,
       'match/moves': null,
@@ -344,8 +374,14 @@ export function applyTurn({ code, room, players }) {
     })
   }
 
-  const winner = result.winner === 'player' ? pair.a : result.winner === 'opponent' ? pair.b : pair.a
-  return finishMatch({ code, room, pair, fighters, winner, log })
+  return update(ref(database, `rooms/${code}`), {
+    status: 'battle',
+    phaseEndsAt: Date.now() + presentationMs + FINAL_PRESENTATION_BUFFER_MS,
+    'match/fighters': fighters,
+    'match/moves': null,
+    'match/log': log,
+    'match/pendingFinish': { winner },
+  })
 }
 
 // Passa para o próximo confronto ou monta a próxima fase.
@@ -399,9 +435,11 @@ export function matchView(room, playerId, players) {
   const ladoB = euLuto ? (sou === pair.a ? pair.b : pair.a) : pair.b
 
   const nome = (id) => players.find((item) => item.id === id)?.masterName || 'Treinador'
+  const invertSides = ladoA !== pair.a
 
   return {
     euLuto,
+    invertSides,
     me: match.fighters?.[ladoA] || null,
     rival: match.fighters?.[ladoB] || null,
     meName: nome(ladoA),
@@ -412,5 +450,6 @@ export function matchView(room, playerId, players) {
     winner: match.winner || null,
     iWon: match.winner === playerId,
     winnerName: match.winner ? nome(match.winner) : null,
+    pendingWinnerName: match.pendingFinish?.winner ? nome(match.pendingFinish.winner) : null,
   }
 }

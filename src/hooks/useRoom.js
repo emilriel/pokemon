@@ -3,6 +3,7 @@ import {
   applyTurn,
   combatantsMoved,
   currentPair,
+  finishPendingMatch,
   isFighting,
   matchView,
   nextMatch,
@@ -169,6 +170,14 @@ export default function useRoom(catalog = []) {
         return
 
       case 'battle':
+        if (room.match?.pendingFinish) {
+          if (expirou) {
+            advance(`finish:${code}:${room.bracket?.current}:${room.match?.round}`,
+              () => finishPendingMatch({ code, room }))
+          }
+          return
+        }
+
         if (expirou || combatantsMoved(room, players)) {
           advance(`turn:${code}:${room.bracket?.current}:${room.match?.round}`,
             () => applyTurn({ code, room, players }))

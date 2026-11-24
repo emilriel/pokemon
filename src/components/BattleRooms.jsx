@@ -319,9 +319,15 @@ export default function BattleRooms({
         opponentLabel={(match?.rivalName || 'RIVAL').toUpperCase()}
         player={match?.me}
         playerLabel={(match?.meName || 'SEU POKÉMON').toUpperCase()}
+        invertSides={match?.invertSides}
         round={match?.round || 1}
         secondsLeft={secondsLeft ?? 0}
-        status={isFighting ? (match?.myMove ? 'resolving' : 'choosing') : 'resolving'}
+        status={match?.pendingWinnerName
+          ? 'resolving'
+          : isFighting
+            ? (match?.myMove ? 'resolving' : 'choosing')
+            : 'resolving'}
+        pendingWinnerName={match?.pendingWinnerName}
         waitingText={isFighting
           ? (match?.myMove ? 'esperando o rival' : 'aguarde')
           : 'você está assistindo'}

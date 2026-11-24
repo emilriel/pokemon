@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react'
 import BattleArena from './components/BattleArena.jsx'
 import BattleRooms from './components/BattleRooms.jsx'
 import CatalogToolbar from './components/CatalogToolbar.jsx'
+import PokemonArt from './components/PokemonArt.jsx'
+import { formatName, typeLabels } from './components/PokemonCard.jsx'
 import PokemonDialog from './components/PokemonDialog.jsx'
 import PokemonGrid from './components/PokemonGrid.jsx'
+import { KANTO_STARTERS } from './data/kantoStarters.js'
 import useBattle from './hooks/useBattle.js'
 import useRoom from './hooks/useRoom.js'
 import usePokedex, { MAX_SELECTED_TYPES } from './hooks/usePokedex.js'
@@ -37,6 +40,10 @@ export default function App() {
   const [battleMode, setBattleMode] = useState(null)
   const battle = useBattle(catalog)
   const rooms = useRoom(catalog)
+  const starterChoices = KANTO_STARTERS.map((starter) => ({
+    ...starter,
+    pokemon: catalog.find((entry) => entry.id === starter.id),
+  }))
 
   const isFiltering = Boolean(query.trim()) || selectedTypes.length > 0 || evolution !== 'all'
   const formattedMatches = totalMatches === null ? '' : numberFormatter.format(totalMatches)
@@ -191,6 +198,37 @@ export default function App() {
                   </span>
                 </button>
               </div>
+              <section className="battle-starter-picker" aria-labelledby="battle-starter-title">
+                <h3 id="battle-starter-title">Ou escolha um inicial de Kanto</h3>
+                <p>Comece o treino com Bulbasaur, Charmander ou Squirtle.</p>
+                <div className="battle-starter-list">
+                  {starterChoices.map((starter) => (
+                    <button
+                      className="battle-starter-choice"
+                      type="button"
+                      key={starter.id}
+                      disabled={!starter.pokemon}
+                      aria-label={`Treinar com ${formatName(starter.name)}`}
+                      onClick={() => handleChooseForBattle(starter.pokemon)}
+                    >
+                      <span className="battle-starter-art">
+                        <PokemonArt
+                          src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${starter.id}.png`}
+                          alt=""
+                        />
+                      </span>
+                      <span className="battle-starter-name">{formatName(starter.name)}</span>
+                      <span className="type-list" aria-label="Tipos">
+                        {starter.types.map((type) => (
+                          <span className={`type-badge type-${type}`} key={type}>
+                            {typeLabels[type] || type}
+                          </span>
+                        ))}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </section>
               {battle.error && (
                 <div className="feedback-panel" role="alert">
                   <span className="feedback-symbol" aria-hidden="true">!</span>
@@ -204,7 +242,7 @@ export default function App() {
                 </button>
               </div>
               <p className="battle-intro-note">
-                O sorteio dos Pokémon e o chaveamento do torneio entram na próxima etapa.
+                No treino, escolha um Pokémon da Pokédex ou um inicial de Kanto. Nas salas, cada confronto é um duelo 1x1.
               </p>
             </section>
           ) : (

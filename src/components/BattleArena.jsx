@@ -1,10 +1,14 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { TURN_SECONDS } from '../hooks/useBattle.js'
-import { moveClassLabel } from '../services/battle.js'
+import {
+  ATTACK_ACTION_INTERVAL_MS,
+  ATTACK_IMPACT_DELAY_MS,
+  moveClassLabel,
+} from '../services/battle.js'
 import PokemonArt from './PokemonArt.jsx'
 import { formatName, typeLabels } from './PokemonCard.jsx'
 
-function Fighter({ effect, fighter, side, sideLabel: given }) {
+function Fighter({ displayHP, effect, fighter, side, sideLabel: given }) {
   const sideLabel = given || (side === 'player' ? 'SEU POKÉMON' : 'RIVAL')
 
   if (!fighter) {
@@ -20,15 +24,16 @@ function Fighter({ effect, fighter, side, sideLabel: given }) {
   }
 
   const name = formatName(fighter.name)
-  const percent = Math.round((fighter.currentHP / fighter.maxHP) * 100)
+  const currentHP = displayHP ?? fighter.currentHP
+  const percent = Math.round((currentHP / fighter.maxHP) * 100)
   const healthLevel = percent <= 25 ? 'baixa' : percent <= 50 ? 'media' : 'alta'
 
   return (
     <article
       className={`battle-fighter battle-fighter-${side}`}
-      data-down={fighter.currentHP === 0}
+      data-down={currentHP === 0}
       data-attacking={effect?.attacking || undefined}
-      data-hit={effect?.impacts.length > 0 || undefined}
+      data-hit={effect?.impacts.some((impact) => impact.kind === 'hit') || undefined}
       data-motion={effect?.motion}
     >
       <span className="fighter-side-label">{sideLabel}</span>
@@ -57,7 +62,7 @@ function Fighter({ effect, fighter, side, sideLabel: given }) {
             key={impact.key}
             aria-hidden="true"
           >
-            {impact.kind === 'hit' ? `-${impact.damage} HP` : 'ERROU!'}
+            {impact.kind === 'hit' ? `-${impact.damage} PV` : 'ERROU!'}
           </span>
         ))}
       </div>
@@ -65,7 +70,7 @@ function Fighter({ effect, fighter, side, sideLabel: given }) {
       <div className="fighter-health">
         <div className="health-label-row">
           <span>VIDA</span>
-          <span>{fighter.currentHP} / {fighter.maxHP}</span>
+          <span>{currentHP} / {fighter.maxHP}</span>
         </div>
         <div
           className="health-track"
@@ -73,7 +78,7 @@ function Fighter({ effect, fighter, side, sideLabel: given }) {
           aria-label={`Vida de ${name}`}
           aria-valuemin="0"
           aria-valuemax={fighter.maxHP}
-          aria-valuenow={fighter.currentHP}
+          aria-valuenow={currentHP}
         >
           <span className="health-fill" data-level={healthLevel} style={{ width: `${percent}%` }} />
         </div>
@@ -84,6 +89,7 @@ function Fighter({ effect, fighter, side, sideLabel: given }) {
 
 export default function BattleArena({
   error,
+  invertSides = false,
   leaveLabel = 'Sair da batalha',
   log,
   onChooseMove,
@@ -93,6 +99,7 @@ export default function BattleArena({
   opponentLabel = 'RIVAL',
   player,
   playerLabel,
+  pendingWinnerName,
   round,
   secondsLeft,
   status,
@@ -100,46 +107,152 @@ export default function BattleArena({
   winner,
 }) {
   const logRef = useRef(null)
+  const [sequence, setSequence] = useState({
+    roundKey: null,
+    activeIndex: -1,
+    resolvedCount: 0,
+    stage: 'done',
+    playing: false,
+  })
   const lastRound = log[log.length - 1]
-  const actionEvents = lastRound?.events.filter((event) => event.kind === 'hit' || event.kind === 'miss') || []
-  const projectiles = actionEvents.flatMap((event, index) => (
-    event.kind === 'hit'
-      ? [{ key: `${lastRound.round}-${index}`, side: event.side, type: event.moveType }]
-      : []
-  ))
+  const actionEvents = lastRound?.events
+    .filter((event) => event.kind === 'hit' || event.kind === 'miss')
+    .map((event) => (
+      invertSides && (event.side === 'player' || event.side === 'opponent')
+        ? { ...event, side: event.side === 'player' ? 'opponent' : 'player' }
+        : event
+    )) || []
+  const roundKey = lastRound ? `${lastRound.round}-${log.length}` : null
+  const hasCurrentSequence = sequence.roundKey === roundKey
+  const activeIndex = hasCurrentSequence
+    ? sequence.activeIndex
+    : actionEvents.length
+      ? 0
+      : -1
+  const resolvedCount = hasCurrentSequence ? sequence.resolvedCount : 0
+  const sequenceStage = hasCurrentSequence ? sequence.stage : 'attack'
+  const sequencePlaying = actionEvents.length > 0
+    && (!hasCurrentSequence || sequence.playing)
+  const activeAction = sequencePlaying ? actionEvents[activeIndex] : null
 
-  function effectForSide(side) {
-    if (!lastRound || !actionEvents.length) return null
+  useEffect(() => {
+    if (!roundKey || !actionEvents.length) {
+      setSequence({
+        roundKey,
+        activeIndex: -1,
+        resolvedCount: 0,
+        stage: 'done',
+        playing: false,
+      })
+      return undefined
+    }
 
-    const impacts = actionEvents.flatMap((event, index) => {
-      const targetSide = event.side === 'player' ? 'opponent' : 'player'
-      if (targetSide !== side) return []
-
-      return [{
-        key: `${lastRound.round}-${index}`,
-        kind: event.kind,
-        damage: event.damage,
-        moveType: event.moveType,
-      }]
+    setSequence({
+      roundKey,
+      activeIndex: 0,
+      resolvedCount: 0,
+      stage: 'attack',
+      playing: true,
     })
 
+    const timeouts = []
+    actionEvents.forEach((_, index) => {
+      if (index > 0) {
+        timeouts.push(window.setTimeout(() => {
+          setSequence((current) => current.roundKey === roundKey
+            ? { ...current, activeIndex: index, stage: 'attack' }
+            : current)
+        }, index * ATTACK_ACTION_INTERVAL_MS))
+      }
+
+      timeouts.push(window.setTimeout(() => {
+        setSequence((current) => current.roundKey === roundKey
+          ? { ...current, resolvedCount: index + 1, stage: 'impact' }
+          : current)
+      }, index * ATTACK_ACTION_INTERVAL_MS + ATTACK_IMPACT_DELAY_MS))
+    })
+    timeouts.push(window.setTimeout(() => {
+      setSequence((current) => current.roundKey === roundKey
+        ? { ...current, activeIndex: -1, resolvedCount: actionEvents.length, stage: 'done', playing: false }
+        : current)
+    }, actionEvents.length * ATTACK_ACTION_INTERVAL_MS))
+
+    return () => timeouts.forEach((timeoutId) => window.clearTimeout(timeoutId))
+  }, [roundKey, actionEvents.length])
+
+  function targetSide(side) {
+    return side === 'player' ? 'opponent' : 'player'
+  }
+
+  function displayHPFor(fighter, side) {
+    if (!fighter || !lastRound || !actionEvents.length) return fighter?.currentHP
+
+    const incoming = actionEvents.filter((event) => event.kind === 'hit' && targetSide(event.side) === side)
+    if (!incoming.length) return fighter.currentHP
+    if (incoming.some((event) => !Number.isFinite(event.targetHPBefore) || !Number.isFinite(event.targetHPAfter))) {
+      return fighter.currentHP
+    }
+
+    const resolvedHits = actionEvents
+      .slice(0, resolvedCount)
+      .filter((event) => event.kind === 'hit' && targetSide(event.side) === side)
+
+    return resolvedHits.length
+      ? resolvedHits[resolvedHits.length - 1].targetHPAfter
+      : incoming[0].targetHPBefore
+  }
+
+  function effectForSide(side) {
+    if (!lastRound || !activeAction) return null
+
+    const isImpact = sequenceStage === 'impact' && targetSide(activeAction.side) === side
     return {
-      attacking: actionEvents.some((event) => event.side === side),
-      impacts,
+      attacking: sequenceStage === 'attack' && activeAction.side === side,
+      impacts: isImpact
+        ? [{
+            key: `${roundKey}-${activeIndex}`,
+            kind: activeAction.kind,
+            damage: activeAction.damage,
+            moveType: activeAction.moveType,
+          }]
+        : [],
       motion: lastRound.round % 2 === 0 ? 'b' : 'a',
     }
   }
+
+  const projectiles = activeAction && sequenceStage === 'attack'
+    ? [{ key: `${roundKey}-${activeIndex}`, side: activeAction.side, type: activeAction.moveType, kind: activeAction.kind }]
+    : []
 
   // Mantém a última rodada visível conforme o histórico cresce.
   useEffect(() => {
     const element = logRef.current
     if (element) element.scrollTop = element.scrollHeight
-  }, [log])
+  }, [log, resolvedCount, sequenceStage])
 
-  const isChoosing = status === 'choosing'
-  const timePercent = Math.max(0, Math.round((secondsLeft / TURN_SECONDS) * 100))
+  const isChoosing = status === 'choosing' && !sequencePlaying && !pendingWinnerName
+  const timePercent = Math.min(100, Math.max(0, Math.round((secondsLeft / TURN_SECONDS) * 100)))
+  const visibleRound = sequencePlaying && lastRound ? lastRound.round : round
+  const sideName = (side) => (side === 'player'
+    ? playerLabel || 'Seu Pokémon'
+    : opponentLabel || 'Rival')
+  const fighterName = (fighter) => (fighter ? formatName(fighter.name) : 'Pokémon')
+  const sequenceMessage = activeAction
+    ? sequenceStage === 'attack'
+      ? `${sideName(activeAction.side)} (${fighterName(activeAction.side === 'player' ? player : opponent)}) usa ${activeAction.move}.`
+      : activeAction.kind === 'hit'
+        ? `Impacto · ${sideName(targetSide(activeAction.side))} (${fighterName(targetSide(activeAction.side) === 'player' ? player : opponent)}) perde ${activeAction.damage} PV.${activeAction.note ? ` ${activeAction.note}` : ''}${activeAction.targetHPAfter === 0 ? ' Nocaute! O contra-ataque foi cancelado.' : ''}`
+        : `O ataque de ${sideName(activeAction.side)} errou.`
+    : pendingWinnerName
+      ? `${pendingWinnerName} venceu o confronto.`
+      : lastRound?.events
+        .filter((event) => event.kind === 'timeout')
+        .map((event) => event.text)
+        .join(' ') || 'Ataques da rodada concluídos.'
 
-  const headline = status === 'preparing'
+  const headline = sequencePlaying
+    ? 'Ataques da rodada'
+    : status === 'preparing'
     ? 'Preparando a batalha...'
     : status === 'finished'
       ? winner === 'player'
@@ -173,7 +286,7 @@ export default function BattleArena({
 
       {status !== 'finished' && status !== 'preparing' && (
         <div className="battle-turn">
-          <span className="battle-round">Rodada {round}</span>
+          <span className="battle-round">Rodada {visibleRound}</span>
           <div className="battle-timer">
             <div className="battle-timer-track" aria-hidden="true">
               <span className="battle-timer-fill" style={{ width: `${timePercent}%` }} data-low={secondsLeft <= 5} />
@@ -185,19 +298,49 @@ export default function BattleArena({
         </div>
       )}
 
+      {status !== 'finished' && status !== 'preparing' && (
+        <p className="battle-turn-note">
+          Cada lado escolhe um golpe; depois eles acontecem em sequência. O mais veloz começa (empate sorteado); um nocaute cancela o contra-ataque.
+        </p>
+      )}
+
+      {lastRound && (actionEvents.length > 0 || lastRound.events.some((event) => event.kind === 'timeout')) && (
+        <div className="battle-sequence" role="status" aria-live="polite" aria-atomic="true">
+          <span className="battle-sequence-label">
+            {sequencePlaying
+              ? `${sequenceStage === 'impact' ? 'Impacto' : 'Ataque'} ${activeIndex + 1} de ${actionEvents.length}`
+              : pendingWinnerName ? 'Confronto encerrado' : 'Resumo da rodada'}
+          </span>
+          <span className="battle-sequence-message">{sequenceMessage}</span>
+        </div>
+      )}
+
       <div className="battle-arena" aria-label="Arena de batalha">
-        <Fighter effect={effectForSide('player')} fighter={player} side="player" sideLabel={playerLabel} />
+        <Fighter
+          displayHP={displayHPFor(player, 'player')}
+          effect={effectForSide('player')}
+          fighter={player}
+          side="player"
+          sideLabel={playerLabel}
+        />
         {projectiles.map((projectile) => (
           <span
             className="battle-projectile"
             data-side={projectile.side}
             data-type={projectile.type}
+            data-kind={projectile.kind}
             key={projectile.key}
             aria-hidden="true"
           />
         ))}
         <span className="battle-versus" aria-hidden="true">VS</span>
-        <Fighter effect={effectForSide('opponent')} fighter={opponent} side="opponent" sideLabel={opponentLabel} />
+        <Fighter
+          displayHP={displayHPFor(opponent, 'opponent')}
+          effect={effectForSide('opponent')}
+          fighter={opponent}
+          side="opponent"
+          sideLabel={opponentLabel}
+        />
       </div>
 
       {status === 'finished' ? (
@@ -217,7 +360,9 @@ export default function BattleArena({
             <h3 className="battle-moves-title">
               Golpes de {formatName(player.name)}
               {!isChoosing && (
-                <span className="battle-moves-hint"> · {waitingText || 'aguarde'}</span>
+                <span className="battle-moves-hint">
+                  {' · '}{sequencePlaying ? 'acompanhe a sequência' : waitingText || 'aguarde'}
+                </span>
               )}
             </h3>
             <div className="move-list">
@@ -243,20 +388,37 @@ export default function BattleArena({
         )
       )}
 
-      <div className="battle-log" ref={logRef} aria-live="polite" aria-atomic="false">
+      <div className="battle-log" ref={logRef} aria-live="off" aria-atomic="false">
         <h3 className="sr-only">O que aconteceu na batalha</h3>
         {lastRound ? (
-          log.map((entry) => (
-            <p className="battle-log-round" key={entry.round}>
-              <span className="battle-log-number">Rodada {entry.round}</span>
-              {entry.events.map((event, index) => (
-                <span className="battle-log-line" key={index}>
-                  {event.text}
-                  {event.note && <strong> {event.note}</strong>}
-                </span>
-              ))}
-            </p>
-          ))
+          log.map((entry, roundIndex) => {
+            let actionIndex = 0
+            let lastActionVisible = false
+            const events = entry === lastRound && sequencePlaying
+              ? entry.events.filter((event) => {
+                  if (event.kind === 'hit' || event.kind === 'miss') {
+                    lastActionVisible = actionIndex < resolvedCount
+                    actionIndex += 1
+                    return lastActionVisible
+                  }
+                  if (event.kind === 'faint') return lastActionVisible
+                  if (event.kind === 'limite') return false
+                  return true
+                })
+              : entry.events
+
+            return (
+              <p className="battle-log-round" key={`${entry.round}-${roundIndex}`}>
+                <span className="battle-log-number">Rodada {entry.round}</span>
+                {events.map((event, index) => (
+                  <span className="battle-log-line" key={index}>
+                    {event.text}
+                    {event.note && <strong> {event.note}</strong>}
+                  </span>
+                ))}
+              </p>
+            )
+          })
         ) : (
           <p className="battle-log-round">
             <span className="battle-log-line">

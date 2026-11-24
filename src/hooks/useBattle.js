@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { chooseMoveForComputer, resolveTurn } from '../services/battle.js'
+import { ATTACK_ACTION_INTERVAL_MS, chooseMoveForComputer, resolveTurn } from '../services/battle.js'
 import { buildFighter } from '../services/fighters.js'
 import { fetchPokemonDetails } from '../services/pokeApi.js'
 
@@ -58,6 +58,9 @@ export default function useBattle(catalog) {
     setOpponent(result.opponent)
     setLog((currentLog) => [...currentLog, { round: roundRef.current, events: result.events }])
 
+    const actionCount = result.events.filter((event) => event.kind === 'hit' || event.kind === 'miss').length
+    const resolveDelay = Math.max(RESOLVE_PAUSE, actionCount * ATTACK_ACTION_INTERVAL_MS + 200)
+
     resolveTimeout.current = window.setTimeout(() => {
       isResolving.current = false
 
@@ -71,7 +74,7 @@ export default function useBattle(catalog) {
       setRound(roundRef.current)
       setSecondsLeft(TURN_SECONDS)
       setStatus('choosing')
-    }, RESOLVE_PAUSE)
+    }, resolveDelay)
   }, [])
 
   // Relógio da rodada: quando zera, o jogador perde a vez e só o rival ataca.

@@ -1,6 +1,9 @@
 import PokemonArt from './PokemonArt.jsx'
+import { KANTO_STARTERS } from '../data/kantoStarters.js'
 import { formatName, typeLabels } from './PokemonCard.jsx'
 import { nomeDaFase } from '../services/match.js'
+
+const KANTO_STARTER_IDS = new Set(KANTO_STARTERS.map(({ id }) => id))
 
 function Tipos({ types }) {
   return (
@@ -130,6 +133,7 @@ export function Sorteio({ team, picked, secondsLeft, onPick, euLuto, rivalName }
           const nome = formatName(member.name)
           const escolhido = picked === index
           const caido = member.currentHP <= 0
+          const inicial = KANTO_STARTER_IDS.has(member.id)
 
           return (
             <button
@@ -145,6 +149,7 @@ export function Sorteio({ team, picked, secondsLeft, onPick, euLuto, rivalName }
                 <PokemonArt src={member.image} alt={`Ilustração de ${nome}`} />
               </span>
               <span className="draft-name">{nome}</span>
+              {inicial && <span className="draft-starter-tag">Inicial de Kanto</span>}
               <Tipos types={member.types} />
               <span className="draft-stat">
                 {caido ? 'Fora de combate' : `Vida ${member.currentHP} de ${member.maxHP}`}
